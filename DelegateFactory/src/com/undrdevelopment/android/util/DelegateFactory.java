@@ -30,226 +30,244 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class DelegateFactory {
 
-	@Retention(RetentionPolicy.RUNTIME)
-	@Target(ElementType.PARAMETER)
-	public @interface DeclaredIn {
-		String value();
-	}
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.PARAMETER)
+    public @interface DeclaredIn {
+        String value();
+    }
 
-	private static final class InvocationHandlerImpl implements
-			InvocationHandler {
-		final Object mDelegate;
-		final Class<?> mClass;
-		final Map<Method, Method> mMethodCache;
+    private static final class InvocationHandlerImpl implements InvocationHandler {
+        final Object mDelegate;
+        final Class<?> mClass;
+        final Map<Method, Method> mMethodCache;
+        final Map<Method, Object> mNegativeCache;
+        private final static Object UNRESOLVED = new Object();
 
-		InvocationHandlerImpl(Class<?> receiver, Class<?> delegateClass,
-				Object delegateInstance) {
-			mDelegate = delegateInstance;
-			mClass = delegateClass;
-			mMethodCache = new ConcurrentHashMap<Method, Method>();
-		}
+        InvocationHandlerImpl(Class<?> receiver, Class<?> delegateClass, Object delegateInstance) {
+            mDelegate = delegateInstance;
+            mClass = delegateClass;
+            mMethodCache = new ConcurrentHashMap<Method, Method>();
+            mNegativeCache = new ConcurrentHashMap<Method, Object>();
+        }
 
-		public final Object invoke(Object target, Method method, Object[] args)
-				throws Throwable {
-			Method delegateMethod = getMethodFromCache(method);
+        public final Object invoke(Object target, Method method, Object[] args) throws Throwable {
+            Method delegateMethod = getMethodFromCache(method);
 
-			if (!hasDelegateMethod(delegateMethod)) {
-				return null;
-			}
+            if (!hasDelegateMethod(delegateMethod)) {
+                return unresolved(method.getReturnType());
+            }
 
-			Object receiver = null;
-			boolean staticMethod = isMethodStatic(delegateMethod);
+            Object receiver = null;
+            boolean staticMethod = isMethodStatic(delegateMethod);
 
-			if (!staticMethod) {
-				receiver = mDelegate;
-			}
+            if (!staticMethod) {
+                receiver = mDelegate;
+            }
 
-			boolean invoke = canInvoke(staticMethod, receiver);
+            boolean invoke = canInvoke(staticMethod, receiver);
 
-			if (!invoke) {
-				return null;
-			}
+            if (!invoke) {
+                return null;
+            }
 
-			Object res = delegateMethod.invoke(receiver, args);
-			return res;
-		}
+            Object res = delegateMethod.invoke(receiver, args);
+            return res;
+        }
 
-		private Method getMethodFromCache(Method method)
-				throws SecurityException {
-			Method delegate;
+        private Object unresolved(Class<?> returnType) {
+            if(!returnType.isPrimitive())
+                return null;
+            if(returnType.equals(Boolean.TYPE))
+                return false;
+            if(returnType.equals(Byte.TYPE))
+                return (byte)0;
+            if(returnType.equals(Short.TYPE))
+                return (short)0;
+            if(returnType.equals(Integer.TYPE))
+                return 0;
+            if(returnType.equals(Long.TYPE))
+                return 0L;
+            if(returnType.equals(Float.TYPE))
+                return 0F;
+            if(returnType.equals(Double.TYPE))
+                return 0D;
+            return null;
+        }
 
-			if (mMethodCache.containsKey(method)) {
-				delegate = mMethodCache.get(method);
-				return delegate;
-			}
+        private Method getMethodFromCache(Method method) throws SecurityException {
+            Method delegate = mMethodCache.get(method);
 
-			delegate = getDelegateMethod(method, mClass);
-			makeAccessible(delegate);
-			mMethodCache.put(method, delegate);
-			return delegate;
-		}
+            if (delegate != null)
+                return delegate;
 
-	}
+            if (mNegativeCache.containsKey(method)) {
+                return null;
+            }
 
-	static final boolean canInvoke(boolean staticMethod, Object receiver) {
-		if (staticMethod) {
-			return true;
-		}
+            delegate = getDelegateMethod(method, mClass);
 
-		boolean b = receiver != null;
-		return b;
-	}
+            if (delegate == null) {
+                mNegativeCache.put(method, UNRESOLVED);
 
-	static final <T> T create(Class<T> type, Class<?> delegateClass,
-			Object delegateInstance) {
-		if (type == null) {
-			throw new IllegalArgumentException("type must not be null");
-		}
+                return null;
+            }
 
-		if (delegateClass == null) {
-			throw new IllegalArgumentException("delegateClass must not be null");
-		}
+            makeAccessible(delegate);
+            mMethodCache.put(method, delegate);
+            return delegate;
+        }
 
-		InvocationHandler handler = new InvocationHandlerImpl(type,
-				delegateClass, delegateInstance);
-		ClassLoader classLoader = type.getClassLoader();
-		Class<?>[] types = new Class[] { type };
-		Object proxy = Proxy.newProxyInstance(classLoader, types, handler);
-		T t = type.cast(proxy);
-		return t;
-	}
+    }
 
-	public static final <T> T create(Class<T> type, Object delegate) {
-		if (delegate == null) {
-			throw new IllegalArgumentException("delegate must not be null");
-		}
+    static final boolean canInvoke(boolean staticMethod, Object receiver) {
+        if (staticMethod) {
+            return true;
+        }
 
-		T t = create(type, delegate.getClass(), delegate);
-		return t;
-	}
+        boolean b = receiver != null;
+        return b;
+    }
 
-	static final <T> T create(Class<T> type, String delegateClassName,
-			Object delegate) throws ClassNotFoundException {
-		if (delegateClassName == null) {
-			throw new IllegalArgumentException(
-					"delegateClassName must not be null");
-		}
+    static final <T> T create(Class<T> type, Class<?> delegateClass, Object delegateInstance) {
+        if (type == null) {
+            throw new IllegalArgumentException("type must not be null");
+        }
 
-		ClassLoader classLoader = type.getClassLoader();
-		Class<?> delegateClass = classLoader.loadClass(delegateClassName);
-		T t = create(type, delegateClass, delegate);
-		return t;
-	}
+        if (delegateClass == null) {
+            throw new IllegalArgumentException("delegateClass must not be null");
+        }
 
-	static final Method getDeclaredMethod(Class<?> type, String name,
-			Class<?>[] params) {
-		for (Class<?> c = type; c != null; c = c.getSuperclass()) {
+        InvocationHandler handler = new InvocationHandlerImpl(type, delegateClass, delegateInstance);
+        ClassLoader classLoader = type.getClassLoader();
+        Class<?>[] types = new Class[] { type };
+        Object proxy = Proxy.newProxyInstance(classLoader, types, handler);
+        T t = type.cast(proxy);
+        return t;
+    }
 
-			Method[] methods = c.getDeclaredMethods();
-			Method m = getMostMatchMethod(name, params, methods);
-			boolean b = m != null;
+    public static final <T> T create(Class<T> type, Object delegate) {
+        if (delegate == null) {
+            throw new IllegalArgumentException("delegate must not be null");
+        }
 
-			if (b) {
-				return m;
-			}
-		}
+        T t = create(type, delegate.getClass(), delegate);
+        return t;
+    }
 
-		return null;
-	}
+    public static final <T> T create(Class<T> type, String delegateClassName, Object delegate) throws ClassNotFoundException {
+        if (delegateClassName == null) {
+            throw new IllegalArgumentException("delegateClassName must not be null");
+        }
 
-	static final Method getDelegateMethod(Method method, Class<?> clazz)
-			throws SecurityException {
-		String name = method.getName();
-		Class<?>[] params = method.getParameterTypes();
-		Method delegateMethod;
+        ClassLoader classLoader = type.getClassLoader();
+        Class<?> delegateClass = classLoader.loadClass(delegateClassName);
+        T t = create(type, delegateClass, delegate);
+        return t;
+    }
 
-		try {
-			delegateMethod = clazz.getMethod(name, params);
-			return delegateMethod;
-		} catch (NoSuchMethodException e) {
-		}
+    static final Method getDeclaredMethod(Class<?> type, String name, Class<?>[] params) {
+        for (Class<?> c = type; c != null; c = c.getSuperclass()) {
 
-		Annotation[][] parameterAnnotations = method.getParameterAnnotations();
-		for (int i = 0, num = parameterAnnotations.length; i < num; ++i) {
-			Annotation[] annotations = parameterAnnotations[i];
-			if (annotations.length <= 0)
-				continue;
-			Annotation annon = annotations[i];
-			Class<?> annonType = annon.annotationType();
-			if (!DeclaredIn.class.equals(annonType))
-				continue;
+            Method[] methods = c.getDeclaredMethods();
+            Method m = getMostMatchMethod(name, params, methods);
+            boolean b = m != null;
 
-			DeclaredIn t = (DeclaredIn) annon;
-			try {
-				Class<?> type = DelegateFactory.class.getClassLoader()
-						.loadClass(t.value());
-				params[i] = type;
-				continue;
-			} catch (ClassNotFoundException e) {
-				throw new RuntimeException(e);
-			}
+            if (b) {
+                return m;
+            }
+        }
 
-		}
+        return null;
+    }
 
-		delegateMethod = getDeclaredMethod(clazz, name, params);
-		return delegateMethod;
-	}
+    static final Method getDelegateMethod(Method method, Class<?> clazz) throws SecurityException {
+        String name = method.getName();
+        Class<?>[] params = method.getParameterTypes();
+        Method delegateMethod;
 
-	static final Method getMostMatchMethod(String name, Class<?>[] params,
-			Method[] methods) {
-		for (Method m : methods) {
-			boolean b = isSignatureMatches(m, name, params);
+        try {
+            delegateMethod = clazz.getMethod(name, params);
+            return delegateMethod;
+        } catch (NoSuchMethodException e) {
+        }
 
-			if (b) {
-				return m;
-			}
-		}
+        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+        for (int i = 0, num = parameterAnnotations.length; i < num; ++i) {
+            Annotation[] annotations = parameterAnnotations[i];
+            if (annotations.length <= 0)
+                continue;
+            Annotation annon = annotations[i];
+            Class<?> annonType = annon.annotationType();
+            if (!DeclaredIn.class.equals(annonType))
+                continue;
 
-		return null;
-	}
+            DeclaredIn t = (DeclaredIn) annon;
+            try {
+                Class<?> type = DelegateFactory.class.getClassLoader().loadClass(t.value());
+                params[i] = type;
+                continue;
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
 
-	static final boolean hasDelegateMethod(Method m) {
-		return m != null;
-	}
+        }
 
-	static final boolean isMethodStatic(Method m) {
-		int modifiers = m.getModifiers();
-		boolean b = Modifier.isStatic(modifiers);
-		return b;
-	}
+        delegateMethod = getDeclaredMethod(clazz, name, params);
+        return delegateMethod;
+    }
 
-	static final boolean isSignatureMatches(Method m, String name,
-			Class<?>[] params) {
-		boolean b;
-		String n = m.getName();
-		b = n.equals(name);
+    static final Method getMostMatchMethod(String name, Class<?>[] params, Method[] methods) {
+        for (Method m : methods) {
+            boolean b = isSignatureMatches(m, name, params);
 
-		if (!b) {
-			return false;
-		}
+            if (b) {
+                return m;
+            }
+        }
 
-		Class<?>[] delegateParams = m.getParameterTypes();
+        return null;
+    }
 
-		b = isParameterMatches(params, delegateParams);
-		return b;
-	}
+    static final boolean hasDelegateMethod(Method m) {
+        return m != null;
+    }
 
-	static final boolean isParameterMatches(Class<?>[] params,
-			Class<?>[] delegateParams) {
-		if (Arrays.equals(params, delegateParams))
-			return true;
-		return false;
-	}
+    static final boolean isMethodStatic(Method m) {
+        int modifiers = m.getModifiers();
+        boolean b = Modifier.isStatic(modifiers);
+        return b;
+    }
 
-	static final void makeAccessible(Method m) {
-		if (m == null) {
-			return;
-		}
+    static final boolean isSignatureMatches(Method m, String name, Class<?>[] params) {
+        boolean b;
+        String n = m.getName();
+        b = n.equals(name);
 
-		if (m.isAccessible()) {
-			return;
-		}
+        if (!b) {
+            return false;
+        }
 
-		m.setAccessible(true);
-	}
+        Class<?>[] delegateParams = m.getParameterTypes();
+
+        b = isParameterMatches(params, delegateParams);
+        return b;
+    }
+
+    static final boolean isParameterMatches(Class<?>[] params, Class<?>[] delegateParams) {
+        if (Arrays.equals(params, delegateParams))
+            return true;
+        return false;
+    }
+
+    static final void makeAccessible(Method m) {
+        if (m == null) {
+            return;
+        }
+
+        if (m.isAccessible()) {
+            return;
+        }
+
+        m.setAccessible(true);
+    }
 }
