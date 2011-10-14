@@ -20,6 +20,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -36,10 +37,22 @@ public abstract class DelegateFactory {
         String value();
     }
 
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public @interface Parameter {
+        boolean isStatic() default false;
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public @interface Delegate {
+    }
+
     private static final class InvocationHandlerImpl implements InvocationHandler {
         final Object mDelegate;
         final Class<?> mClass;
         final Map<Method, Method> mMethodCache;
+        final Map<Method, Field> mFieldCache;
         final Map<Method, Object> mNegativeCache;
         private final static Object UNRESOLVED = new Object();
 
@@ -47,10 +60,16 @@ public abstract class DelegateFactory {
             mDelegate = delegateInstance;
             mClass = delegateClass;
             mMethodCache = new ConcurrentHashMap<Method, Method>();
+            mFieldCache = new ConcurrentHashMap<Method, Field>();
             mNegativeCache = new ConcurrentHashMap<Method, Object>();
         }
 
         public final Object invoke(Object target, Method method, Object[] args) throws Throwable {
+
+            if (isParameter(method)) {
+                return obtainField(method, args);
+            }
+
             Method delegateMethod = getMethodFromCache(method);
 
             if (!hasDelegateMethod(delegateMethod)) {
@@ -71,25 +90,44 @@ public abstract class DelegateFactory {
             }
 
             Object res = delegateMethod.invoke(receiver, args);
+
+            if (method.getReturnType().isAnnotationPresent(Delegate.class)) {
+                return DelegateFactory.create(method.getReturnType(), res);
+            }
+
             return res;
         }
 
-        private Object unresolved(Class<?> returnType) {
-            if(!returnType.isPrimitive())
+        private Object obtainField(Method method, Object[] args) throws IllegalArgumentException, IllegalAccessException {
+            Field field = getFieldFromCache(method);
+
+            if (field == null)
                 return null;
-            if(returnType.equals(Boolean.TYPE))
+
+            if (args == null || args.length == 0) {
+                return field.get(mDelegate);
+            }
+
+            field.set(mDelegate, args[0]);
+            return null;
+        }
+
+        private Object unresolved(Class<?> returnType) {
+            if (!returnType.isPrimitive())
+                return null;
+            if (returnType.equals(Boolean.TYPE))
                 return false;
-            if(returnType.equals(Byte.TYPE))
-                return (byte)0;
-            if(returnType.equals(Short.TYPE))
-                return (short)0;
-            if(returnType.equals(Integer.TYPE))
+            if (returnType.equals(Byte.TYPE))
+                return (byte) 0;
+            if (returnType.equals(Short.TYPE))
+                return (short) 0;
+            if (returnType.equals(Integer.TYPE))
                 return 0;
-            if(returnType.equals(Long.TYPE))
+            if (returnType.equals(Long.TYPE))
                 return 0L;
-            if(returnType.equals(Float.TYPE))
+            if (returnType.equals(Float.TYPE))
                 return 0F;
-            if(returnType.equals(Double.TYPE))
+            if (returnType.equals(Double.TYPE))
                 return 0D;
             return null;
         }
@@ -115,6 +153,29 @@ public abstract class DelegateFactory {
             makeAccessible(delegate);
             mMethodCache.put(method, delegate);
             return delegate;
+        }
+
+        private Field getFieldFromCache(Method method) throws SecurityException {
+            Field field = mFieldCache.get(method);
+
+            if (field != null)
+                return field;
+
+            if (mNegativeCache.containsKey(method)) {
+                return null;
+            }
+
+            field = getField(method, mClass);
+
+            if (field == null) {
+                mNegativeCache.put(method, UNRESOLVED);
+
+                return null;
+            }
+
+            makeAccessible(field);
+            mFieldCache.put(method, field);
+            return field;
         }
 
     }
@@ -155,11 +216,13 @@ public abstract class DelegateFactory {
     }
 
     public static final <T> T create(Class<T> type, String delegateClassName, Object delegate) throws ClassNotFoundException {
+        return create(type, delegateClassName, type.getClassLoader(), delegate);
+    }
+
+    public static final <T> T create(Class<T> type, String delegateClassName, ClassLoader classLoader, Object delegate) throws ClassNotFoundException {
         if (delegateClassName == null) {
             throw new IllegalArgumentException("delegateClassName must not be null");
         }
-
-        ClassLoader classLoader = type.getClassLoader();
         Class<?> delegateClass = classLoader.loadClass(delegateClassName);
         T t = create(type, delegateClass, delegate);
         return t;
@@ -216,6 +279,35 @@ public abstract class DelegateFactory {
         return delegateMethod;
     }
 
+    static final Field getField(Method method, Class<?> clazz) throws SecurityException {
+        String name = method.getName();
+        String fieldName;
+        if (name.startsWith("set")) {
+            fieldName = name.substring(3);
+        } else if (name.startsWith("is")) {
+            fieldName = name.substring(2);
+        } else if (name.startsWith("get")) {
+            fieldName = name.substring(3);
+        } else {
+            throw new IllegalArgumentException();
+        }
+
+        Field field;
+
+        try {
+            if (method.getAnnotation(Parameter.class).isStatic()) {
+                field = clazz.getField(fieldName);
+            } else {
+                String canonicalName = fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
+                field = clazz.getField(canonicalName);
+            }
+            return field;
+        } catch (NoSuchFieldException e) {
+        }
+
+        return null;
+    }
+
     static final Method getMostMatchMethod(String name, Class<?>[] params, Method[] methods) {
         for (Method m : methods) {
             boolean b = isSignatureMatches(m, name, params);
@@ -230,6 +322,10 @@ public abstract class DelegateFactory {
 
     static final boolean hasDelegateMethod(Method m) {
         return m != null;
+    }
+
+    static final boolean isParameter(Method m) {
+        return m.isAnnotationPresent(Parameter.class);
     }
 
     static final boolean isMethodStatic(Method m) {
@@ -270,4 +366,17 @@ public abstract class DelegateFactory {
 
         m.setAccessible(true);
     }
+
+    static final void makeAccessible(Field f) {
+        if (f == null) {
+            return;
+        }
+
+        if (f.isAccessible()) {
+            return;
+        }
+
+        f.setAccessible(true);
+    }
+
 }
