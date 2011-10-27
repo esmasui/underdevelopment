@@ -105,7 +105,15 @@ public abstract class DelegateFactory {
                 return null;
 
             if (args == null || args.length == 0) {
-                return field.get(mDelegate);
+
+                Object f = field.get(mDelegate);
+
+                if (method.getReturnType().isAnnotationPresent(Delegate.class)) {
+
+                    return DelegateFactory.create(method.getReturnType(), f);
+                }
+
+                return f;
             }
 
             field.set(mDelegate, args[0]);
@@ -280,6 +288,7 @@ public abstract class DelegateFactory {
     }
 
     static final Field getField(Method method, Class<?> clazz) throws SecurityException {
+
         String name = method.getName();
         String fieldName;
         if (name.startsWith("set")) {
@@ -292,17 +301,27 @@ public abstract class DelegateFactory {
             throw new IllegalArgumentException();
         }
 
-        Field field;
+        Field field = null;
 
-        try {
-            if (method.getAnnotation(Parameter.class).isStatic()) {
+        if (method.getAnnotation(Parameter.class).isStatic()) {
+            try {
                 field = clazz.getField(fieldName);
-            } else {
-                String canonicalName = fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
-                field = clazz.getField(canonicalName);
+                return field;
+            } catch (NoSuchFieldException e) {
             }
-            return field;
-        } catch (NoSuchFieldException e) {
+            return null;
+        } else {
+            String canonicalName = fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
+            for (Class<?> cls = clazz; cls != null; cls = cls.getSuperclass()) {
+                try {
+                    field = clazz.getDeclaredField(canonicalName);
+                } catch (NoSuchFieldException e) {
+                }
+                if (field != null) {
+                    return field;
+                }
+            }
+
         }
 
         return null;
