@@ -1,17 +1,17 @@
 /*
- *    Copyright 2011 esmasui@gmail.com
+ * Copyright (C) 2012 uPhyca Inc.
  *
- *   Licensed under the Apache License, Version 2.0 (the "License");
- *   you may not use this file except in compliance with the License.
- *   You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *       http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.undrdevelopment.android.util;
 
@@ -25,7 +25,6 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,7 +55,9 @@ public abstract class DelegateFactory {
         final Map<Method, Object> mNegativeCache;
         private final static Object UNRESOLVED = new Object();
 
-        InvocationHandlerImpl(Class<?> receiver, Class<?> delegateClass, Object delegateInstance) {
+        InvocationHandlerImpl(Class<?> receiver,
+                              Class<?> delegateClass,
+                              Object delegateInstance) {
             mDelegate = delegateInstance;
             mClass = delegateClass;
             mMethodCache = new ConcurrentHashMap<Method, Method>();
@@ -64,7 +65,9 @@ public abstract class DelegateFactory {
             mNegativeCache = new ConcurrentHashMap<Method, Object>();
         }
 
-        public final Object invoke(Object target, Method method, Object[] args) throws Throwable {
+        public final Object invoke(Object target,
+                                   Method method,
+                                   Object[] args) throws Throwable {
 
             if (isParameter(method)) {
                 return obtainField(method, args);
@@ -91,14 +94,16 @@ public abstract class DelegateFactory {
 
             Object res = delegateMethod.invoke(receiver, args);
 
-            if (method.getReturnType().isAnnotationPresent(Delegate.class)) {
+            if (method.getReturnType()
+                      .isAnnotationPresent(Delegate.class)) {
                 return DelegateFactory.create(method.getReturnType(), res);
             }
 
             return res;
         }
 
-        private Object obtainField(Method method, Object[] args) throws IllegalArgumentException, IllegalAccessException {
+        private Object obtainField(Method method,
+                                   Object[] args) throws IllegalArgumentException, IllegalAccessException {
             Field field = getFieldFromCache(method);
 
             if (field == null)
@@ -108,7 +113,8 @@ public abstract class DelegateFactory {
 
                 Object f = field.get(mDelegate);
 
-                if (method.getReturnType().isAnnotationPresent(Delegate.class)) {
+                if (method.getReturnType()
+                          .isAnnotationPresent(Delegate.class)) {
 
                     return DelegateFactory.create(method.getReturnType(), f);
                 }
@@ -188,7 +194,8 @@ public abstract class DelegateFactory {
 
     }
 
-    static final boolean canInvoke(boolean staticMethod, Object receiver) {
+    static final boolean canInvoke(boolean staticMethod,
+                                   Object receiver) {
         if (staticMethod) {
             return true;
         }
@@ -197,7 +204,9 @@ public abstract class DelegateFactory {
         return b;
     }
 
-    static final <T> T create(Class<T> type, Class<?> delegateClass, Object delegateInstance) {
+    static final <T> T create(Class<T> type,
+                              Class<?> delegateClass,
+                              Object delegateInstance) {
         if (type == null) {
             throw new IllegalArgumentException("type must not be null");
         }
@@ -206,7 +215,9 @@ public abstract class DelegateFactory {
             throw new IllegalArgumentException("delegateClass must not be null");
         }
 
-        InvocationHandler handler = new InvocationHandlerImpl(type, delegateClass, delegateInstance);
+        InvocationHandler handler = new InvocationHandlerImpl(type,
+                                                              delegateClass,
+                                                              delegateInstance);
         ClassLoader classLoader = type.getClassLoader();
         Class<?>[] types = new Class[] { type };
         Object proxy = Proxy.newProxyInstance(classLoader, types, handler);
@@ -214,7 +225,8 @@ public abstract class DelegateFactory {
         return t;
     }
 
-    public static final <T> T create(Class<T> type, Object delegate) {
+    public static final <T> T create(Class<T> type,
+                                     Object delegate) {
         if (delegate == null) {
             throw new IllegalArgumentException("delegate must not be null");
         }
@@ -223,11 +235,16 @@ public abstract class DelegateFactory {
         return t;
     }
 
-    public static final <T> T create(Class<T> type, String delegateClassName, Object delegate) throws ClassNotFoundException {
+    public static final <T> T create(Class<T> type,
+                                     String delegateClassName,
+                                     Object delegate) throws ClassNotFoundException {
         return create(type, delegateClassName, type.getClassLoader(), delegate);
     }
 
-    public static final <T> T create(Class<T> type, String delegateClassName, ClassLoader classLoader, Object delegate) throws ClassNotFoundException {
+    public static final <T> T create(Class<T> type,
+                                     String delegateClassName,
+                                     ClassLoader classLoader,
+                                     Object delegate) throws ClassNotFoundException {
         if (delegateClassName == null) {
             throw new IllegalArgumentException("delegateClassName must not be null");
         }
@@ -236,7 +253,9 @@ public abstract class DelegateFactory {
         return t;
     }
 
-    static final Method getDeclaredMethod(Class<?> type, String name, Class<?>[] params) {
+    static final Method getDeclaredMethod(Class<?> type,
+                                          String name,
+                                          Class<?>[] params) {
         for (Class<?> c = type; c != null; c = c.getSuperclass()) {
 
             Method[] methods = c.getDeclaredMethods();
@@ -251,7 +270,8 @@ public abstract class DelegateFactory {
         return null;
     }
 
-    static final Method getDelegateMethod(Method method, Class<?> clazz) throws SecurityException {
+    static final Method getDelegateMethod(Method method,
+                                          Class<?> clazz) throws SecurityException {
         String name = method.getName();
         Class<?>[] params = method.getParameterTypes();
         Method delegateMethod;
@@ -267,27 +287,32 @@ public abstract class DelegateFactory {
             Annotation[] annotations = parameterAnnotations[i];
             if (annotations.length <= 0)
                 continue;
-            Annotation annon = annotations[i];
-            Class<?> annonType = annon.annotationType();
-            if (!DeclaredIn.class.equals(annonType))
-                continue;
+            for (int j = 0, jnum = annotations.length; j < jnum; ++j) {
+                Annotation annon = annotations[j];
+                Class<?> annonType = annon.annotationType();
+                if (!DeclaredIn.class.isAssignableFrom(annonType))
+                    //if (!DeclaredIn.class.equals(annonType))
+                    continue;
 
-            DeclaredIn t = (DeclaredIn) annon;
-            try {
-                Class<?> type = DelegateFactory.class.getClassLoader().loadClass(t.value());
-                params[i] = type;
-                continue;
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
+                DeclaredIn t = (DeclaredIn) annon;
+                try {
+                    Class<?> type = DelegateFactory.class.getClassLoader()
+                                                         .loadClass(t.value());
+                    params[i] = type;
+                    continue;
+                } catch (ClassNotFoundException e) {
+                    params[i] = Object.class;
+                    //throw new RuntimeException(e);
+                }
             }
-
         }
 
         delegateMethod = getDeclaredMethod(clazz, name, params);
         return delegateMethod;
     }
 
-    static final Field getField(Method method, Class<?> clazz) throws SecurityException {
+    static final Field getField(Method method,
+                                Class<?> clazz) throws SecurityException {
 
         String name = method.getName();
         String fieldName;
@@ -303,7 +328,8 @@ public abstract class DelegateFactory {
 
         Field field = null;
 
-        if (method.getAnnotation(Parameter.class).isStatic()) {
+        if (method.getAnnotation(Parameter.class)
+                  .isStatic()) {
             try {
                 field = clazz.getField(fieldName);
                 return field;
@@ -311,7 +337,8 @@ public abstract class DelegateFactory {
             }
             return null;
         } else {
-            String canonicalName = fieldName.substring(0, 1).toLowerCase() + fieldName.substring(1);
+            String canonicalName = fieldName.substring(0, 1)
+                                            .toLowerCase() + fieldName.substring(1);
             for (Class<?> cls = clazz; cls != null; cls = cls.getSuperclass()) {
                 try {
                     field = clazz.getDeclaredField(canonicalName);
@@ -327,7 +354,9 @@ public abstract class DelegateFactory {
         return null;
     }
 
-    static final Method getMostMatchMethod(String name, Class<?>[] params, Method[] methods) {
+    static final Method getMostMatchMethod(String name,
+                                           Class<?>[] params,
+                                           Method[] methods) {
         for (Method m : methods) {
             boolean b = isSignatureMatches(m, name, params);
 
@@ -353,7 +382,9 @@ public abstract class DelegateFactory {
         return b;
     }
 
-    static final boolean isSignatureMatches(Method m, String name, Class<?>[] params) {
+    static final boolean isSignatureMatches(Method m,
+                                            String name,
+                                            Class<?>[] params) {
         boolean b;
         String n = m.getName();
         b = n.equals(name);
@@ -368,10 +399,24 @@ public abstract class DelegateFactory {
         return b;
     }
 
-    static final boolean isParameterMatches(Class<?>[] params, Class<?>[] delegateParams) {
-        if (Arrays.equals(params, delegateParams))
-            return true;
-        return false;
+    static final boolean isParameterMatches(Class<?>[] params,
+                                            Class<?>[] delegateParams) {
+        //        if (Arrays.equals(params, delegateParams))
+        //            return true;
+        if (params.length != delegateParams.length) {
+            return false;
+        }
+
+        for (int i = 0, num = params.length; i < num; ++i) {
+            if (params[i].isPrimitive()) {
+                if (!params[i].equals(delegateParams[i])) {
+                    return false;
+                }
+            } else if (!delegateParams[i].isAssignableFrom(params[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static final void makeAccessible(Method m) {
