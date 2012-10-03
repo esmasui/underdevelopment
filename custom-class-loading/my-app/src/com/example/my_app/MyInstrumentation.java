@@ -33,10 +33,17 @@ public class MyInstrumentation extends Instrumentation {
 
     @Override
     public void onCreate(Bundle arguments) {
+
         super.onCreate(arguments);
 
-        // クラスローダーを構成する
-        myClassLoader = buildCustomClassLoader(getTargetContext());
+        getCustomLoader(getTargetContext());
+    }
+
+    private ClassLoader getCustomLoader(Context context) {
+        if (myClassLoader != null)
+            return myClassLoader;
+        myClassLoader = buildCustomClassLoader(context);
+        return myClassLoader;
     }
 
     /**
@@ -44,7 +51,8 @@ public class MyInstrumentation extends Instrumentation {
      */
     private String getLibraryCodePath(Context context,
                                       String packageName) throws NameNotFoundException {
-        Context libraryContext = context.createPackageContext(packageName, 0);
+        int flag = Context.CONTEXT_RESTRICTED | Context.CONTEXT_INCLUDE_CODE | Context.CONTEXT_IGNORE_SECURITY;
+        Context libraryContext = context.createPackageContext(packageName, flag);
         String packageCodePath = libraryContext.getPackageCodePath();
         return packageCodePath;
     }
@@ -58,8 +66,11 @@ public class MyInstrumentation extends Instrumentation {
         }
 
         //my_appのクラスローダーの親クラスローダーを得る
-        final ClassLoader parent = context.getClassLoader()
-                                          .getParent();
+        //        final ClassLoader parent = context.getClassLoader()
+        //                                          .getParent();
+        final ClassLoader parent = ClassLoader.getSystemClassLoader();
+        if (parent == null)
+            throw new IllegalStateException();
         //my_app, my_libraryをセパレータで区切ってdexPathを構成する
         String dexPath = libraryCodePath + File.pathSeparator + context.getPackageCodePath();
         //dexPathを指定してPathClassLoaderを構成する
@@ -75,7 +86,7 @@ public class MyInstrumentation extends Instrumentation {
     public Activity newActivity(ClassLoader cl,
                                 String className,
                                 Intent intent) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        return super.newActivity(myClassLoader, className, intent);
+        return super.newActivity(getCustomLoader(getTargetContext()), className, intent);
     }
 
     /**
@@ -85,6 +96,6 @@ public class MyInstrumentation extends Instrumentation {
     public Application newApplication(ClassLoader cl,
                                       String className,
                                       Context context) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        return super.newApplication(myClassLoader, className, context);
+        return super.newApplication(getCustomLoader(context), className, context);
     }
 }

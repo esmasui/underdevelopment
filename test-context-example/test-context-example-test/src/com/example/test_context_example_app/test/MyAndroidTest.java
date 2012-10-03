@@ -16,7 +16,7 @@ public class MyAndroidTest extends AndroidTestCase {
         //getContext()は、//instrumentaiton/targetPackageのコンテキストを返す
         assertEquals("com.example.test_context_example_app", getContext().getPackageName());
         
-        //mTestContextには、//instrumentaiton/targetPackageのコンテキストが設定される
+        //mTestContextには、テストパッケージのコンテキストが設定される
         assertEquals("com.example.test_context_example_app.test", mTestContext.getPackageName());
     }
 }
