@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">はじめてのDI</string>
+    <string name="app_name_non_di">DIじゃない</string>
+    <string name="app_name_self_di">じぶんでDI</string>
+    <string name="weather_unknown">不明</string>
+    <string name="label_kawasaki">川崎</string>
+    <string name="label_yokohama">横浜</string>
+    <string name="address_kawasaki">神奈川県川崎市</string>
+    <string name="address_yokohama">神奈川県横浜市</string>
+
+</resources>

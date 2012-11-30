@@ -1,0 +1,39 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="@dimen/padding"
+    tools:context=".MainActivity" >
+
+    <TextView
+        android:id="@+id/label_kawasaki"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/margin"
+        android:text="@string/label_kawasaki" />
+
+    <TextView
+        android:id="@+id/weather_kawasaki"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@id/label_kawasaki"
+        android:layout_toRightOf="@id/label_kawasaki"
+        android:text="@string/weather_unknown" />
+
+    <TextView
+        android:id="@+id/label_yokohama"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/label_kawasaki"
+        android:layout_margin="@dimen/margin"
+        android:text="@string/label_yokohama" />
+
+    <TextView
+        android:id="@+id/weather_yokohama"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignBottom="@id/label_yokohama"
+        android:layout_toRightOf="@id/label_yokohama"
+        android:text="@string/weather_unknown" />
+
+</RelativeLayout>

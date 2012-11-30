@@ -1,0 +1,98 @@
+/*
+ * Copyright (C) 2012 uPhyca Inc. http://www.uphyca.com/
+ * 
+ * Android Advent Calendar 2012 http://androidadvent.blogspot.jp/
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.uphyca.myfirst.di.test;
+
+import static org.mockito.BDDMockito.given;
+import android.content.Context;
+import android.content.Intent;
+import android.widget.TextView;
+
+import com.google.inject.Inject;
+import com.uphyca.myfirst.di.MainActivity;
+import com.uphyca.myfirst.di.R;
+import com.uphyca.myfirst.di.model.WeatherReport;
+import com.uphyca.myfirst.di.model.WeatherReportSchedule;
+import com.uphyca.testing.Dependency;
+import com.uphyca.testing.InjectionActivityUnitTestCase;
+
+/** {@link MainActivity}のユニットテスト */
+public class MainActivityUnitTestCase extends InjectionActivityUnitTestCase<MainActivity> {
+
+    /** {@link WeatherReportSchedule}のモックオブジェクト */
+    @Inject @Dependency
+    private WeatherReportSchedule mMockWeatherReportSchedule;
+
+    /** {@link WeatherReport}のモックオブジェクト */
+    @Inject @Dependency
+    private WeatherReport mMockWeatherReport;
+
+    private Context mContext;
+    private Intent mStartIntent;
+
+    public MainActivityUnitTestCase() {
+        super(MainActivity.class);
+    }
+
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        mContext = getInstrumentation().getTargetContext();
+        mStartIntent = new Intent();
+    }
+
+    /** 事前条件を確認する */
+    public void testPreconditions() {
+        startActivity(mStartIntent, null, null);
+        assertNotNull(getActivity());
+    }
+
+    /** スケジュールに従った時間に対して、天気予報オブジェクトから取得した天気が画面に表示されていることを確認する */
+    public void testShowWeatherOnActivityCreated() {
+
+        //-- Given
+
+        //次の予報対象時間
+        final long reportTimeMillis = 1L;
+        //川崎の住所
+        final String addressKawasaki = mContext.getString(R.string.address_kawasaki);
+        //横浜の住所
+        final String addressYokohama = mContext.getString(R.string.address_yokohama);
+
+        //次の対象予報時間を返すようにモックオブジェクトを設定する
+        given(mMockWeatherReportSchedule.getNextReportTimeMillis()).willReturn(reportTimeMillis);
+        //川崎の予報として晴れを返すようにモックオブジェクトを設定する
+        given(mMockWeatherReport.reportWeather(addressKawasaki, reportTimeMillis)).willReturn("晴れ");
+        //横浜の予報として曇を返すようにモックオブジェクトを設定する
+        given(mMockWeatherReport.reportWeather(addressYokohama, reportTimeMillis)).willReturn("曇");
+
+        //-- When
+
+        //Activityを起動する
+        startActivity(mStartIntent, null, null);
+
+        //-- Then
+
+        //川崎の天気の表示が晴れになっていること
+        TextView weatherKawasaki = (TextView) getActivity().findViewById(R.id.weather_kawasaki);
+        assertEquals("川崎の天気は晴れ", weatherKawasaki.getText(), "晴れ");
+
+        //横浜の天気の表示が曇になっていること
+        TextView weatherYokohama = (TextView) getActivity().findViewById(R.id.weather_yokohama);
+        assertEquals("横浜の天気は曇", weatherYokohama.getText(), "曇");
+    }
+}
