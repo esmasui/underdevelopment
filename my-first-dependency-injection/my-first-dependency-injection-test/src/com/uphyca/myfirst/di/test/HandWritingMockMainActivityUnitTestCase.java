@@ -76,6 +76,9 @@ public class HandWritingMockMainActivityUnitTestCase extends InjectionActivityUn
             @Override
             public String reportWeather(String address,
                                         long date) {
+                if(date != reportTimeMillis){
+                    return null;
+                }
                 return address.equals(addressKawasaki) ? "晴れ" : address.equals(addressYokohama) ? "曇" : "まだわかんないよ";
             }
         };
