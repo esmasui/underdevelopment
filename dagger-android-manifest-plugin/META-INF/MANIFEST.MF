@@ -1,0 +1,25 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: DaggerAndroidManifestPlugin
+Bundle-SymbolicName: com.uphyca.dagger.androidmanifest;singleton:=true
+Bundle-Version: 0.9.1
+Bundle-Activator: com.uphyca.dagger.androidmanifest.Activator
+Bundle-Vendor: uPhyca Inc.
+Require-Bundle: org.eclipse.ui,
+ org.eclipse.core.runtime,
+ org.eclipse.core.resources
+Bundle-RequiredExecutionEnvironment: JavaSE-1.6
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .,
+ libs/dagger-androidmanifest-plugin-0.9.1.jar,
+ libs/dagger-compiler-0.9.1.jar,
+ libs/dagger-0.9.1.jar,
+ libs/javax.inject-1.jar
+Export-Package: com.uphyca.dagger.androidmanifest,
+ dagger,
+ dagger.androidmanifest,
+ dagger.internal;x-internal:=true,
+ dagger.internal.codegen;x-internal:=true,
+ dagger.internal.plugins.loading;x-internal:=true,
+ dagger.internal.plugins.reflect;x-internal:=true,
+ javax.inject

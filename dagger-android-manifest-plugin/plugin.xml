@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         id="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestBuilder"
+         name="Dagger AndroidManifest Builder"
+         point="org.eclipse.core.resources.builders">
+      <builder
+            hasNature="true">
+         <run
+               class="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestBuilder">
+         </run>
+      </builder>
+   </extension>
+   <extension
+         id="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestNature"
+         name="Dagger AndroidManifest Nature"
+         point="org.eclipse.core.resources.natures">
+      <runtime>
+         <run
+               class="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestNature">
+         </run>
+      </runtime>
+      <builder
+            id="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestBuilder">
+      </builder>
+   </extension>
+   <extension
+         point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            adaptable="true"
+            objectClass="org.eclipse.core.resources.IProject"
+            nameFilter="*"
+            id="com.uphyca.dagger.androidmanifest.contribution1">
+         <action
+               class="com.uphyca.dagger.androidmanifest.ToggleNatureAction"
+               enablesFor="+"
+               id="com.uphyca.dagger.androidmanifest.AddRemoveNatureAction"
+               label="Enable Dagger AndroidManifest Plugin"
+               style="push"
+	           menubarPath="org.eclipse.ui.projectConfigure/additions">
+         </action>
+         <visibility>
+           <and>
+             <objectState name="open" value="true"/>
+             <not>
+               <objectState name="nature" value="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestNature"/>
+             </not>
+           </and>
+         </visibility>
+      </objectContribution>
+   </extension>
+   <extension
+         point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            adaptable="true"
+            objectClass="org.eclipse.core.resources.IProject"
+            nameFilter="*"
+            id="com.uphyca.dagger.androidmanifest.contribution1">
+         <action
+               class="com.uphyca.dagger.androidmanifest.ToggleNatureAction"
+               enablesFor="+"
+               id="com.uphyca.dagger.androidmanifest.AddRemoveNatureAction"
+               label="Disable Dagger AndroidManifest Plugin"
+               style="push"
+	           menubarPath="additions">
+         </action>
+         <visibility>
+           <and>
+             <objectState name="open" value="true"/>
+             <objectState name="nature" value="com.uphyca.dagger.androidmanifest.DaggerAndroidManifestNature"/>
+           </and>
+         </visibility>
+      </objectContribution>
+   </extension>
+
+</plugin>
