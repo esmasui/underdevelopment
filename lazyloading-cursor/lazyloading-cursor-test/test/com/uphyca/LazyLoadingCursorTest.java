@@ -64,7 +64,8 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
     public void testThreshold() {
         invokeTestThreshold(128); // DEFAULT_BLOCK_SIZE
         invokeTestThreshold(1);
-        invokeTestThreshold(1024);
+        invokeTestThreshold(2);
+        invokeTestThreshold(10);
     }
 
     private void invokeTestThreshold(int blockSize) {

@@ -6,7 +6,6 @@ import android.content.ContentValues;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
-import android.test.MoreAsserts;
 import android.test.ProviderTestCase2;
 import android.test.suitebuilder.annotation.Suppress;
 import android.util.Log;
@@ -14,7 +13,7 @@ import android.util.Log;
 public abstract class Benchmark<T extends ContentProvider> extends ProviderTestCase2<T> {
 
     private static final String TEST_AUTHORITY = "com.uphyca.lazyloadingcursor";
-    private static final int EXPECTED_COUNT = 30000;
+    private static final int RECORD_COUNT = 30000;
     private static final boolean FETCH_ALL = true;
 
     public Benchmark(Class<T> providerClass) {
@@ -31,7 +30,7 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
         SQLiteDatabase db = sqLiteOpenHelper.getWritableDatabase();
         db.beginTransaction();
 
-        for (int i = 0; i < EXPECTED_COUNT; ++i) {
+        for (int i = 0; i < RECORD_COUNT; ++i) {
 
             ContentValues hoge = new ContentValues();
             hoge.put("name", "hoge");
@@ -65,103 +64,47 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
     }
 
     public void testSmallRecords() {
-        long current = System.currentTimeMillis();
-
-        String[] projection = {
-                "_id", "name"
-        };
-        String selection = "name = ?";
-        String[] selectionArgs = {
-            "hoge"
-        };
-        String sortOrder = "name";
-
-        Cursor result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
-
-        assertNotNull(result);
-        MoreAsserts.assertEquals(new String[] {
-                "_id", "name"
-        }, result.getColumnNames());
-
-        assertEquals(EXPECTED_COUNT, result.getCount());
-        assertTrue(result.moveToNext());
-        assertEquals("hoge", result.getString(result.getColumnIndex("name")));
-
-        while (FETCH_ALL && result.moveToNext()) {
-        }
-
-        result.close();
-
-        long end = System.currentTimeMillis();
-
-        Log.i("Benchmark", toString() + "=" + (end - current) + "(ms)");
-
+        invokeTest("name = ?", //
+                   new String[] {
+                       "hoge",
+                   });
     }
 
     public void testMediumRecords() {
-        long current = System.currentTimeMillis();
-
-        String[] projection = {
-                "_id", "name"
-        };
-        String selection = "name in (?, ?)";
-        String[] selectionArgs = {
-                "hoge", "piyo"
-        };
-        String sortOrder = "name";
-
-        Cursor result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
-
-        assertNotNull(result);
-        MoreAsserts.assertEquals(new String[] {
-                "_id", "name"
-        }, result.getColumnNames());
-
-        assertEquals(EXPECTED_COUNT * 2, result.getCount());
-        assertTrue(result.moveToNext());
-        assertEquals("hoge", result.getString(result.getColumnIndex("name")));
-
-        while (FETCH_ALL && result.moveToNext()) {
-        }
-
-        result.close();
-
-        long end = System.currentTimeMillis();
-
-        Log.i("Benchmark", toString() + "=" + (end - current) + "(ms)");
+        invokeTest("name in (?, ?)", //
+                   new String[] {
+                           "hoge", "piyo",
+                   });
     }
 
     public void testLargeRecords() {
+        invokeTest("name in (?, ?, ?)", //
+                   new String[] {
+                           "hoge", "piyo", "fuga",
+                   });
+    }
+
+    void invokeTest(String selection, String[] selectionArgs) {
         long current = System.currentTimeMillis();
 
         String[] projection = {
                 "_id", "name"
-        };
-        String selection = "name in (?, ?, ?)";
-        String[] selectionArgs = {
-                "hoge", "piyo", "fuga"
         };
         String sortOrder = "name";
 
         Cursor result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
 
         assertNotNull(result);
-        MoreAsserts.assertEquals(new String[] {
-                "_id", "name"
-        }, result.getColumnNames());
 
-        assertEquals(EXPECTED_COUNT * 3, result.getCount());
         assertTrue(result.moveToNext());
-        assertEquals("fuga", result.getString(result.getColumnIndex("name")));
+
+        Log.i("Benchmark", toString() + ":fetchFirst==" + (System.currentTimeMillis() - current) + "(ms)");
 
         while (FETCH_ALL && result.moveToNext()) {
         }
 
         result.close();
 
-        long end = System.currentTimeMillis();
-
-        Log.i("Benchmark", toString() + "=" + (end - current) + "(ms)");
+        Log.i("Benchmark", toString() + ":fetchAll=" + (System.currentTimeMillis() - current) + "(ms)");
     }
-
 }

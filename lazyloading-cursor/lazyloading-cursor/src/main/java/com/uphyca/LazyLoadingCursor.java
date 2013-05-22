@@ -1,7 +1,21 @@
+/*
+ * Copyright (C) 2013 uPhyca Inc. 
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package com.uphyca;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -16,14 +30,14 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 
-public class LazyLoadingCursor extends AbstractCursor {
+class LazyLoadingCursor extends AbstractCursor {
 
     private final class LazyLoadingDataSetObserver extends DataSetObserver {
         @Override
         public void onInvalidated() {
             super.onInvalidated();
             mCount = -1;
-            mCursorIndex = -1;
+            mCursor = null;
         }
     }
 
@@ -34,10 +48,9 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     private final Context mContext;
     private final Uri mContentUri;
-    private List<CursorProxy> mCursors;
+    private CursorProxy[] mCursors;
     private CursorProxy mCursor;
     private int mCount;
-    private int mCursorIndex;
 
     private final String[] mColumns;
     private final String mSelection;
@@ -48,11 +61,11 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     private final String[] mColumnNames;
 
-    private List<Operations.Operation> mOperations = new ArrayList<Operations.Operation>();
+    private final List<Operations.Operation> mOperations;
 
     private final SQLiteDatabase mDatabase;
 
-    private SQLiteQueryBuilder mQueryBuilder;
+    private final SQLiteQueryBuilder mQueryBuilder;
 
     public LazyLoadingCursor(Context context, Uri uri, SQLiteDatabase db, List<Operations.Operation> op, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, int blockSize) {
         mContext = context;
@@ -67,9 +80,6 @@ public class LazyLoadingCursor extends AbstractCursor {
         mGroupBy = groupBy;
         mHaving = having;
         mOrderBy = sortOrder;
-
-        mCursors = new ArrayList<CursorProxy>();
-        mCursorIndex = -1;
 
         mQueryBuilder = execOperations(new SQLiteQueryBuilder());
         String rawSql = mQueryBuilder.buildQuery(projectionIn, selection, null, groupBy, having, sortOrder, limit);
@@ -120,20 +130,6 @@ public class LazyLoadingCursor extends AbstractCursor {
         return 0;
     }
 
-    private static final int calcBlockPosition(int size, int blockSize, int rawPosition) {
-        if (size == 0) {
-            return -1;
-        }
-
-        for (int i = 0, pos = 0; i <= size; ++i) {
-            pos += calcActualBlockSize(blockSize, i);
-            if ((pos - 1) >= rawPosition) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
     private static final int calcOffsetCount(int size, int blockSize, int position) {
         if (size == 0) {
             return -1;
@@ -155,26 +151,17 @@ public class LazyLoadingCursor extends AbstractCursor {
         }
         mCount = mCounter.getInt(0);
         final int blockCount = calcBlockCount(mCount, mBlockSize);
-        //        int size = mCount / mBlockSize;
-        //        if ((mCount - size * mBlockSize) > 0)
-        //            size += 1;
 
-        List<CursorProxy> oldCursors = mCursors;
-        if (oldCursors == null) {
-            mCursors = new ArrayList<CursorProxy>(blockCount);
-        }
-
-        int oldSize = (oldCursors == null) ? 0 : oldCursors.size();
-        for (int position = 0; position < blockCount; ++position) {
-            if (position < oldSize) {
-                Cursor c = oldCursors.get(position);
-                c.requery();
-                continue;
+        CursorProxy[] oldCursors = mCursors;
+        if (oldCursors != null) {
+            for (CursorProxy each : oldCursors) {
+                if (each != null) {
+                    each.close();
+                }
             }
-            CursorProxy c = new CursorProxy(null, calcOffsetCount(mCount, mBlockSize, position), calcActualBlockSize(mBlockSize, position));
-            c.setNotificationUri(context.getContentResolver(), contentUri);
-            mCursors.add(c);
         }
+
+        mCursors = new CursorProxy[blockCount];
     }
 
     @Override
@@ -184,20 +171,27 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public boolean onMove(int oldPosition, int newPosition) {
-        if (oldPosition == newPosition && mCursorIndex > -1) {
-            return true;
+        final CursorProxy c = mCursor;
+
+        if (c != null && c.hasPosition(newPosition)) {
+            return c.moveToAbsolutePosition(newPosition);
         }
 
-        int index = calcBlockPosition(mCount, mBlockSize, newPosition);
-
-        if (index != mCursorIndex) {
-            mCursor = mCursors.get(index);
-            mCursorIndex = index;
+        final CursorProxy[] cursors = mCursors;
+        for (int i = 0, size = cursors.length; i < size; ++i) {
+            CursorProxy each = cursors[i];
+            if (each == null) {
+                each = new CursorProxy(null, calcOffsetCount(mCount, mBlockSize, i), calcActualBlockSize(mBlockSize, i));
+                each.setNotificationUri(mContext.getContentResolver(), mContentUri);
+                cursors[i] = each;
+            }
+            if (each.hasPosition(newPosition)) {
+                mCursor = each;
+                return each.moveToAbsolutePosition(newPosition);
+            }
         }
 
-        int pos = newPosition - mCursor.mOffsetCount;
-
-        return mCursor.moveToPosition(pos);
+        return false;
     }
 
     // /**
@@ -281,10 +275,9 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void deactivate() {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c != null) {
-                c.deactivate();
+        for (Cursor each : mCursors) {
+            if (each != null) {
+                each.deactivate();
             }
         }
         mCounter.deactivate();
@@ -293,22 +286,23 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void close() {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c == null)
-                continue;
-            c.close();
+        for (Cursor each : mCursors) {
+            if (each != null) {
+                each.close();
+            }
         }
         mCounter.close();
+        mCursor = null;
         super.close();
     }
 
     @Override
     public void registerContentObserver(ContentObserver observer) {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c != null) {
-                c.registerContentObserver(observer);
+        if (mCursors != null) {
+            for (CursorProxy each : mCursors) {
+                if (each != null) {
+                    each.registerContentObserver(observer);
+                }
             }
         }
         mCounter.registerContentObserver(observer);
@@ -316,10 +310,11 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void unregisterContentObserver(ContentObserver observer) {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c != null) {
-                c.unregisterContentObserver(observer);
+        if (mCursors != null) {
+            for (CursorProxy each : mCursors) {
+                if (each != null) {
+                    each.unregisterContentObserver(observer);
+                }
             }
         }
         mCounter.unregisterContentObserver(observer);
@@ -327,10 +322,11 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void registerDataSetObserver(DataSetObserver observer) {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c != null) {
-                c.registerDataSetObserver(observer);
+        if (mCursors != null) {
+            for (CursorProxy each : mCursors) {
+                if (each != null) {
+                    each.registerDataSetObserver(observer);
+                }
             }
         }
         mCounter.registerDataSetObserver(observer);
@@ -338,10 +334,11 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void unregisterDataSetObserver(DataSetObserver observer) {
-        for (int i = 0, length = mCursors.size(); i < length; i++) {
-            Cursor c = mCursors.get(i);
-            if (c != null) {
-                c.unregisterDataSetObserver(observer);
+        if (mCursors != null) {
+            for (CursorProxy each : mCursors) {
+                if (each != null) {
+                    each.unregisterDataSetObserver(observer);
+                }
             }
         }
         mCounter.unregisterDataSetObserver(observer);
@@ -384,6 +381,14 @@ public class LazyLoadingCursor extends AbstractCursor {
             mUnderlying = cursor;
         }
 
+        final boolean hasPosition(int absolutePosition) {
+            return (mOffsetCount <= absolutePosition) && (mOffsetCount + mActualBlockSize > absolutePosition);
+        }
+
+        final boolean moveToAbsolutePosition(int absolutePosition) {
+            return moveToPosition(absolutePosition - mOffsetCount);
+        }
+
         @Override
         public int getCount() {
             return mActualBlockSize;
@@ -392,7 +397,7 @@ public class LazyLoadingCursor extends AbstractCursor {
         @Override
         public boolean onMove(int oldPosition, int newPosition) {
             if (mUnderlying == null) {
-                String limit = mOffsetCount + "," + mActualBlockSize;
+                final String limit = mOffsetCount + "," + mActualBlockSize;
                 SQLiteCursor c = (SQLiteCursor) mQueryBuilder.query(mDatabase, mColumns, mSelection, mSelectionArgs, mGroupBy, mHaving, mOrderBy, limit);
                 swapCursor(c);
             }
