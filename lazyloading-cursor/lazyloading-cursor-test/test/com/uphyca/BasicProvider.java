@@ -36,9 +36,14 @@ public class BasicProvider extends StubProvider {
 
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-
         long id = mSQLite.getWritableDatabase()
                          .insert("sample", null, values);
         return Uri.parse(Long.toString(id));
+    }
+
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        return mSQLite.getWritableDatabase()
+                      .delete("sample", selection, selectionArgs);
     }
 }

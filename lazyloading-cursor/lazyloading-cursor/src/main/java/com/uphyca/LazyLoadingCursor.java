@@ -34,8 +34,8 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     private final Context mContext;
     private final Uri mContentUri;
-    private List<Cursor> mCursors;
-    private Cursor mCursor;
+    private List<CursorProxy> mCursors;
+    private CursorProxy mCursor;
     private int mCount;
     private int mCursorIndex;
 
@@ -52,6 +52,8 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     private final SQLiteDatabase mDatabase;
 
+    private SQLiteQueryBuilder mQueryBuilder;
+
     public LazyLoadingCursor(Context context, Uri uri, SQLiteDatabase db, List<Operations.Operation> op, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, int blockSize) {
         mContext = context;
         mContentUri = uri;
@@ -66,11 +68,11 @@ public class LazyLoadingCursor extends AbstractCursor {
         mHaving = having;
         mOrderBy = sortOrder;
 
-        mCursors = new ArrayList<Cursor>();
+        mCursors = new ArrayList<CursorProxy>();
         mCursorIndex = -1;
 
-        SQLiteQueryBuilder builder = execOperations(new SQLiteQueryBuilder());
-        String rawSql = builder.buildQuery(projectionIn, selection, null, groupBy, having, sortOrder, limit);
+        mQueryBuilder = execOperations(new SQLiteQueryBuilder());
+        String rawSql = mQueryBuilder.buildQuery(projectionIn, selection, null, groupBy, having, sortOrder, limit);
 
         String countSql = String.format("SELECT COUNT(" + (projectionIn != null ? projectionIn[0] : "'X'") + ") COUNT FROM(%s)", rawSql);
 
@@ -83,7 +85,7 @@ public class LazyLoadingCursor extends AbstractCursor {
         mCounter.setNotificationUri(context.getContentResolver(), mContentUri);
 
         if (projectionIn == null) {
-            Cursor cursor = builder.query(db, projectionIn, selection, selectionArgs, groupBy, having, null, "0,0");
+            Cursor cursor = mQueryBuilder.query(db, projectionIn, selection, selectionArgs, groupBy, having, null, "0,0");
             mColumnNames = cursor.getColumnNames();
             cursor.close();
         } else {
@@ -100,27 +102,76 @@ public class LazyLoadingCursor extends AbstractCursor {
         return builder;
     }
 
+    private static final int calcActualBlockSize(int blockSize, int position) {
+        return (int) (blockSize * Math.pow(2, position));
+    }
+
+    private static final int calcBlockCount(int rawCount, int blockSize) {
+        if (rawCount == 0) {
+            return 0;
+        }
+
+        for (int i = 0, actualCount = 0; i <= rawCount; ++i) {
+            actualCount += calcActualBlockSize(blockSize, i);
+            if (actualCount >= rawCount) {
+                return (i + 1);
+            }
+        }
+        return 0;
+    }
+
+    private static final int calcBlockPosition(int size, int blockSize, int rawPosition) {
+        if (size == 0) {
+            return -1;
+        }
+
+        for (int i = 0, pos = 0; i <= size; ++i) {
+            pos += calcActualBlockSize(blockSize, i);
+            if ((pos - 1) >= rawPosition) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static final int calcOffsetCount(int size, int blockSize, int position) {
+        if (size == 0) {
+            return -1;
+        }
+
+        int returnThis = 0;
+        for (int i = 0; i < position; ++i) {
+            returnThis += calcActualBlockSize(blockSize, i);
+        }
+
+        return returnThis;
+    }
+
     private void allocate(Context context, Uri contentUri, SQLiteDatabase db) {
         if (mCounter.isBeforeFirst()) {
-            mCounter.moveToFirst();
+            if (!mCounter.moveToFirst()) {
+                return;
+            }
         }
         mCount = mCounter.getInt(0);
-        int size = mCount / mBlockSize;
-        if ((mCount - size * mBlockSize) > 0)
-            size += 1;
+        final int blockCount = calcBlockCount(mCount, mBlockSize);
+        //        int size = mCount / mBlockSize;
+        //        if ((mCount - size * mBlockSize) > 0)
+        //            size += 1;
 
-        List<Cursor> oldCursors = mCursors;
-        if (oldCursors == null)
-            mCursors = new ArrayList<Cursor>(size);
+        List<CursorProxy> oldCursors = mCursors;
+        if (oldCursors == null) {
+            mCursors = new ArrayList<CursorProxy>(blockCount);
+        }
 
-        int oldSize = oldCursors == null ? 0 : oldCursors.size();
-        for (int position = 0; position < size; ++position) {
+        int oldSize = (oldCursors == null) ? 0 : oldCursors.size();
+        for (int position = 0; position < blockCount; ++position) {
             if (position < oldSize) {
                 Cursor c = oldCursors.get(position);
                 c.requery();
                 continue;
             }
-            CursorProxy c = new CursorProxy(null, mBlockSize, position);
+            CursorProxy c = new CursorProxy(null, calcOffsetCount(mCount, mBlockSize, position), calcActualBlockSize(mBlockSize, position));
             c.setNotificationUri(context.getContentResolver(), contentUri);
             mCursors.add(c);
         }
@@ -128,24 +179,24 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public int getCount() {
-        // return counter.getInt(0);
         return mCount;
     }
 
     @Override
     public boolean onMove(int oldPosition, int newPosition) {
-
-        if (oldPosition == newPosition && mCursorIndex > -1)
+        if (oldPosition == newPosition && mCursorIndex > -1) {
             return true;
+        }
 
-        int index = newPosition / mBlockSize;
+        int index = calcBlockPosition(mCount, mBlockSize, newPosition);
 
         if (index != mCursorIndex) {
             mCursor = mCursors.get(index);
             mCursorIndex = index;
         }
 
-        int pos = newPosition - (index * mBlockSize);
+        int pos = newPosition - mCursor.mOffsetCount;
+
         return mCursor.moveToPosition(pos);
     }
 
@@ -303,34 +354,22 @@ public class LazyLoadingCursor extends AbstractCursor {
         }
 
         allocate(mContext, mContentUri, mDatabase);
-
-        // for (int i = 0, length = cursors.size(); i < length; i++) {
-        // Cursor c = cursors.get(i);
-        // if (c == null) {
-        // continue;
-        // }
-        //
-        // if (c.requery() == false) {
-        // return false;
-        // }
-        // }
-
         return true;
     }
 
     private final class CursorProxy extends AbstractCursor {
 
-        Set<DataSetObserver> mDataSetObservers;
-        Set<ContentObserver> mContentObservers;
+        private Set<DataSetObserver> mDataSetObservers;
+        private Set<ContentObserver> mContentObservers;
 
-        int mAmount;
-        int mPosition;
-        Cursor mUnderlying;
+        private Cursor mUnderlying;
+        private final int mOffsetCount;
+        private final int mActualBlockSize;
 
-        public CursorProxy(Cursor cursor, int amount, int position) {
+        public CursorProxy(Cursor cursor, int offsetCount, int actualBlockSize) {
             mUnderlying = cursor;
-            mAmount = amount;
-            mPosition = position;
+            mOffsetCount = offsetCount;
+            mActualBlockSize = actualBlockSize;
         }
 
         final void swapCursor(Cursor cursor) {
@@ -347,21 +386,14 @@ public class LazyLoadingCursor extends AbstractCursor {
 
         @Override
         public int getCount() {
-            int offset = mPosition * mAmount;
-            int count = LazyLoadingCursor.this.getCount();
-            int t = count - offset;
-            if (t > mAmount) {
-                return mAmount;
-            }
-            return t;
+            return mActualBlockSize;
         }
 
         @Override
         public boolean onMove(int oldPosition, int newPosition) {
             if (mUnderlying == null) {
-                SQLiteQueryBuilder builder = execOperations(new SQLiteQueryBuilder());
-                String limit = (mPosition * mAmount) + "," + mAmount;
-                SQLiteCursor c = (SQLiteCursor) builder.query(mDatabase, mColumns, mSelection, mSelectionArgs, mGroupBy, mHaving, mOrderBy, limit);
+                String limit = mOffsetCount + "," + mActualBlockSize;
+                SQLiteCursor c = (SQLiteCursor) mQueryBuilder.query(mDatabase, mColumns, mSelection, mSelectionArgs, mGroupBy, mHaving, mOrderBy, limit);
                 swapCursor(c);
             }
             try {

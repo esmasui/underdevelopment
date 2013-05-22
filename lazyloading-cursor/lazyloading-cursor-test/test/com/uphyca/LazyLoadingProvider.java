@@ -41,4 +41,10 @@ public class LazyLoadingProvider extends StubProvider {
                          .insert("sample", null, values);
         return Uri.parse(Long.toString(id));
     }
+
+    @Override
+    public int delete(Uri uri, String selection, String[] selectionArgs) {
+        return mSQLite.getWritableDatabase()
+                      .delete("sample", selection, selectionArgs);
+    }
 }

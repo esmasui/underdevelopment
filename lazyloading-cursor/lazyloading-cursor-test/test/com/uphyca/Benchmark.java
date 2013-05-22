@@ -15,6 +15,7 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
 
     private static final String TEST_AUTHORITY = "com.uphyca.lazyloadingcursor";
     private static final int EXPECTED_COUNT = 30000;
+    private static final boolean FETCH_ALL = true;
 
     public Benchmark(Class<T> providerClass) {
         super(providerClass, TEST_AUTHORITY);
@@ -86,8 +87,8 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
         assertTrue(result.moveToNext());
         assertEquals("hoge", result.getString(result.getColumnIndex("name")));
 
-        //                while (result.moveToNext()) {
-        //                }
+        while (FETCH_ALL && result.moveToNext()) {
+        }
 
         result.close();
 
@@ -120,8 +121,8 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
         assertTrue(result.moveToNext());
         assertEquals("hoge", result.getString(result.getColumnIndex("name")));
 
-        //        while (result.moveToNext()) {
-        //        }
+        while (FETCH_ALL && result.moveToNext()) {
+        }
 
         result.close();
 
@@ -153,8 +154,8 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
         assertTrue(result.moveToNext());
         assertEquals("fuga", result.getString(result.getColumnIndex("name")));
 
-        //while (result.moveToNext()) {
-        //}
+        while (FETCH_ALL && result.moveToNext()) {
+        }
 
         result.close();
 

@@ -1,11 +1,15 @@
 
 package com.uphyca;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
 import android.test.MoreAsserts;
 import android.test.ProviderTestCase2;
+import android.util.Log;
 
 public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider> {
 
@@ -15,10 +19,12 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
         super(LazyLoadingProvider.class, TEST_AUTHORITY);
     }
 
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
+    public void testPreconditions() {
+        assertNotNull(getProvider());
+    }
 
+    public void testQuery() {
+        //Given
         ContentValues hoge = new ContentValues();
         hoge.put("name", "hoge");
         ContentValues piyo = new ContentValues();
@@ -29,13 +35,8 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
         getProvider().bulkInsert(Uri.parse(TEST_AUTHORITY), new ContentValues[] {
                 hoge, piyo, fuga
         });
-    }
 
-    public void testPreconditions() {
-        assertNotNull(getProvider());
-    }
-
-    public void testQuery() {
+        //When
         String[] projection = {
                 "_id", "name"
         };
@@ -47,6 +48,7 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
 
         Cursor result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
 
+        //Then
         assertNotNull(result);
         MoreAsserts.assertEquals(new String[] {
                 "_id", "name"
@@ -57,5 +59,69 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
         assertEquals("hoge", result.getString(result.getColumnIndex("name")));
 
         result.close();
+    }
+
+    public void testThreshold() {
+        invokeTestThreshold(128); // DEFAULT_BLOCK_SIZE
+        invokeTestThreshold(1);
+        invokeTestThreshold(1024);
+    }
+
+    private void invokeTestThreshold(int blockSize) {
+        invokeTestThreshold(blockSize, 0);
+        invokeTestThreshold(blockSize, 1);
+        invokeTestThreshold(blockSize, blockSize);
+        invokeTestThreshold(blockSize, blockSize - 1);
+        invokeTestThreshold(blockSize, blockSize + 1);
+        invokeTestThreshold(blockSize, blockSize * 2);
+        invokeTestThreshold(blockSize, blockSize * 2 - 1);
+        invokeTestThreshold(blockSize, blockSize * 2 + 1);
+        invokeTestThreshold(blockSize, blockSize * 10);
+        invokeTestThreshold(blockSize, blockSize * 10 - 1);
+        invokeTestThreshold(blockSize, blockSize * 10 + 1);
+    }
+
+    private void invokeTestThreshold(int blockSize, int count) {
+
+        List<ContentValues> values = new ArrayList<ContentValues>();
+        for (int i = 0; i < count; ++i) {
+            ContentValues v = new ContentValues();
+            v.put("name", String.format("%08d", i));
+            values.add(v);
+        }
+        Cursor result = null;
+        try {
+
+            getProvider().bulkInsert(Uri.parse(TEST_AUTHORITY), values.toArray(new ContentValues[values.size()]));
+
+            //When
+            String[] projection = {
+                    "_id", "name"
+            };
+            String selection = null;
+            String[] selectionArgs = null;
+            String sortOrder = "name";
+
+            result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
+
+            //Then
+            assertNotNull(result);
+            MoreAsserts.assertEquals(new String[] {
+                    "_id", "name"
+            }, result.getColumnNames());
+
+            assertEquals(count, result.getCount());
+            int fetchCount = 0;
+            while (result.moveToNext()) {
+                assertEquals(String.format("%08d", fetchCount), result.getString(result.getColumnIndex("name")));
+                ++fetchCount;
+            }
+            assertEquals(count, fetchCount);
+        } finally {
+            if (result != null) {
+                result.close();
+            }
+            getProvider().delete(Uri.parse(TEST_AUTHORITY), null, null);
+        }
     }
 }
