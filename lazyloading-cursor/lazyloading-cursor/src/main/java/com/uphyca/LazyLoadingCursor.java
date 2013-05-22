@@ -19,6 +19,9 @@ package com.uphyca;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import android.content.Context;
 import android.database.AbstractCursor;
@@ -41,9 +44,9 @@ class LazyLoadingCursor extends AbstractCursor {
         }
     }
 
-    private final DataSetObserver mDataSetObserver;
+    private final DataSetObserver mDataSetObserver = new LazyLoadingDataSetObserver();
 
-    private final Cursor mCounter;
+    private Cursor mCounter;
     private final int mBlockSize;
 
     private final Context mContext;
@@ -59,50 +62,95 @@ class LazyLoadingCursor extends AbstractCursor {
     private final String mHaving;
     private final String mOrderBy;
 
-    private final String[] mColumnNames;
+    private String[] mColumnNames;
 
     private final List<Operations.Operation> mOperations;
 
+    private final SQLiteDatabase mCounterDatabase;
     private final SQLiteDatabase mDatabase;
-
     private final SQLiteQueryBuilder mQueryBuilder;
 
-    public LazyLoadingCursor(Context context, Uri uri, SQLiteDatabase db, List<Operations.Operation> op, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, int blockSize) {
+    private static final ExecutorService sExec = Executors.newCachedThreadPool();
+
+    public LazyLoadingCursor(Context context, Uri uri, SQLiteDatabase db, List<Operations.Operation> op, final String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, final String limit, int blockSize) {
         mContext = context;
         mContentUri = uri;
         mDatabase = db;
+        mCounterDatabase = SQLiteDatabase.openDatabase(db.getPath(), null, SQLiteDatabase.OPEN_READONLY);
         mOperations = op;
         mBlockSize = blockSize;
-
         mColumns = projectionIn;
         mSelection = selection;
         mSelectionArgs = selectionArgs;
         mGroupBy = groupBy;
         mHaving = having;
         mOrderBy = sortOrder;
-
         mQueryBuilder = execOperations(new SQLiteQueryBuilder());
-        String rawSql = mQueryBuilder.buildQuery(projectionIn, selection, null, groupBy, having, sortOrder, limit);
 
-        String countSql = String.format("SELECT COUNT(" + (projectionIn != null ? projectionIn[0] : "'X'") + ") COUNT FROM(%s)", rawSql);
+        final CountDownLatch sync = new CountDownLatch(3);
+        final CursorProxy[] cursorHoler = new CursorProxy[1];
 
-        Cursor counter = db.rawQuery(countSql, selectionArgs);
-
-        mDataSetObserver = new LazyLoadingDataSetObserver();
-        counter.registerDataSetObserver(mDataSetObserver);
-
-        mCounter = counter;
-        mCounter.setNotificationUri(context.getContentResolver(), mContentUri);
-
-        if (projectionIn == null) {
-            Cursor cursor = mQueryBuilder.query(db, projectionIn, selection, selectionArgs, groupBy, having, null, "0,0");
-            mColumnNames = cursor.getColumnNames();
-            cursor.close();
-        } else {
-            mColumnNames = projectionIn;
+        sExec.execute(new Runnable() {
+            @Override
+            public void run() {
+                mCounter = initCounter(limit);
+                sync.countDown();
+            };
+        });
+        sExec.execute(new Runnable() {
+            @Override
+            public void run() {
+                mColumnNames = initColumnNames(projectionIn);
+                sync.countDown();
+            };
+        });
+        sExec.execute(new Runnable() {
+            @Override
+            public void run() {
+                cursorHoler[0] = initFirstCursor();
+                sync.countDown();
+            };
+        });
+        try {
+            sync.await();
+        } catch (InterruptedException e) {
+            close();
+            return;
         }
+        mCount = mCounter.getInt(0);
+        mCursors = new CursorProxy[calcBlockCount(mCount, blockSize)];
+        if (mCursors.length > 0) {
+            mCursors[0] = cursorHoler[0];
+        }
+    }
 
-        allocate(mContext, mContentUri, db);
+    private final Cursor initCounter(String limit) {
+        String rawSql = mQueryBuilder.buildQuery(mColumns, mSelection, null, mGroupBy, mHaving, mOrderBy, limit);
+        String countSql = String.format("SELECT COUNT(" + (mColumns != null ? mColumns[0] : "'X'") + ") COUNT FROM(%s) LIMIT 1", rawSql);
+        Cursor returnThis = mCounterDatabase.rawQuery(countSql, mSelectionArgs);
+        returnThis.registerDataSetObserver(mDataSetObserver);
+        returnThis.setNotificationUri(mContext.getContentResolver(), mContentUri);
+        returnThis.moveToFirst();
+        return returnThis;
+    }
+
+    private final String[] initColumnNames(String[] projectionIn) {
+        SQLiteDatabase db = SQLiteDatabase.openDatabase(mDatabase.getPath(), null, SQLiteDatabase.OPEN_READONLY);
+        Cursor cursor = null;
+        try {
+            cursor = mQueryBuilder.query(db, projectionIn, mSelection, mSelectionArgs, mGroupBy, mHaving, null, "0,0");
+            return cursor.getColumnNames();
+        } finally {
+            cursor.close();
+            db.close();
+        }
+    }
+
+    private final CursorProxy initFirstCursor() {
+        final int actualBlockSize = calcActualBlockSize(mBlockSize, 0);
+        CursorProxy returnThis = new CursorProxy(null, 0, actualBlockSize);
+        returnThis.moveToFirst();
+        return returnThis;
     }
 
     private SQLiteQueryBuilder execOperations(SQLiteQueryBuilder builder) {
@@ -143,7 +191,7 @@ class LazyLoadingCursor extends AbstractCursor {
         return returnThis;
     }
 
-    private void allocate(Context context, Uri contentUri, SQLiteDatabase db) {
+    private void reallocate(Context context, Uri contentUri, SQLiteDatabase db) {
         if (mCounter.isBeforeFirst()) {
             if (!mCounter.moveToFirst()) {
                 return;
@@ -286,13 +334,25 @@ class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public void close() {
-        for (Cursor each : mCursors) {
-            if (each != null) {
-                each.close();
+        if (mCursors != null) {
+            for (Cursor each : mCursors) {
+                if (each != null) {
+                    each.close();
+                }
             }
+            mCursors = null;
         }
-        mCounter.close();
-        mCursor = null;
+        if (mCounter != null) {
+            mCounter.close();
+            mCounter = null;
+        }
+        if (mCounterDatabase != null) {
+            mCounterDatabase.close();
+        }
+        if (mCursor != null) {
+            mCursor = null;
+            mCursor = null;
+        }
         super.close();
     }
 
@@ -350,7 +410,7 @@ class LazyLoadingCursor extends AbstractCursor {
             return false;
         }
 
-        allocate(mContext, mContentUri, mDatabase);
+        reallocate(mContext, mContentUri, mDatabase);
         return true;
     }
 

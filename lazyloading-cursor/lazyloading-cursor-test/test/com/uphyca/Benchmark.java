@@ -63,6 +63,13 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
     public void testAndroidTestCaseSetupProperly() {
     }
 
+    public void testTinyRecords() {
+        invokeTest("_id <= ?", //
+                   new String[] {
+                       "1000",
+                   });
+    }
+
     public void testSmallRecords() {
         invokeTest("name = ?", //
                    new String[] {

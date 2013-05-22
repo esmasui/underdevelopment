@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -88,6 +89,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      * java.lang.String, java.lang.String, java.lang.String, java.lang.String,
      * java.lang.String)
      */
+    @SuppressLint("NewApi")
     @Override
     public String buildQuery(String[] projectionIn, String selection, String groupBy, String having, String sortOrder, String limit) {
         return super.buildQuery(projectionIn, selection, groupBy, having, sortOrder, limit);
@@ -113,6 +115,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      * .String, java.lang.String[], java.util.Set, int, java.lang.String,
      * java.lang.String, java.lang.String, java.lang.String)
      */
+    @SuppressLint("NewApi")
     @Override
     public String buildUnionSubQuery(String typeDiscriminatorColumn, String[] unionColumns, Set<String> columnsPresentInTable, int computedColumnsOffset, String typeDiscriminatorValue, String selection, String groupBy, String having) {
         return super.buildUnionSubQuery(typeDiscriminatorColumn, unionColumns, columnsPresentInTable, computedColumnsOffset, typeDiscriminatorValue, selection, groupBy, having);
@@ -229,6 +232,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      * (non-Javadoc)
      * @see android.database.sqlite.SQLiteQueryBuilder#setStrict(boolean)
      */
+    @SuppressLint("NewApi")
     @Override
     public void setStrict(boolean flag) {
         super.setStrict(flag);
