@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import java.util.Map;
@@ -5,100 +6,100 @@ import java.util.Map;
 import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.database.sqlite.SQLiteQueryBuilder;
 
-public class Operations {
+public final class Operations {
 
     static interface Operation {
         void exec(SQLiteQueryBuilder builder);
     }
 
     static final class AppendWhere implements Operation {
-        final CharSequence inWhere;
+        final CharSequence mInWhere;
 
         public AppendWhere(CharSequence inWhere) {
-            this.inWhere = inWhere;
+            mInWhere = inWhere;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.appendWhere(inWhere);
+            builder.appendWhere(mInWhere);
         }
     }
 
     static final class AppendWhereEscapeString implements Operation {
-        final String inWhere;
+        final String mInWhere;
 
         public AppendWhereEscapeString(String inWhere) {
-            this.inWhere = inWhere;
+            mInWhere = inWhere;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.appendWhereEscapeString(inWhere);
+            builder.appendWhereEscapeString(mInWhere);
         }
     }
 
     static final class SetCursorFactory implements Operation {
-        final CursorFactory factory;
+        final CursorFactory mFactory;
 
         public SetCursorFactory(CursorFactory factory) {
-            this.factory = factory;
+            mFactory = factory;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.setCursorFactory(factory);
+            builder.setCursorFactory(mFactory);
         }
     }
 
     static final class SetDistinct implements Operation {
-        final boolean distinct;
+        final boolean mDistinct;
 
         public SetDistinct(boolean distinct) {
-            this.distinct = distinct;
+            mDistinct = distinct;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.setDistinct(distinct);
+            builder.setDistinct(mDistinct);
         }
     }
 
     static final class SetTables implements Operation {
-        final String inTables;
+        final String mInTables;
 
         public SetTables(String inTables) {
-            this.inTables = inTables;
+            mInTables = inTables;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.setTables(inTables);
+            builder.setTables(mInTables);
         }
     }
 
     static final class SetProjectionMap implements Operation {
-        final Map<String, String> columnMap;
+        final Map<String, String> mColumnMap;
 
         public SetProjectionMap(Map<String, String> columnMap) {
-            this.columnMap = columnMap;
+            mColumnMap = columnMap;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.setProjectionMap(columnMap);
+            builder.setProjectionMap(mColumnMap);
         }
     }
 
     static final class SetStrict implements Operation {
-        final boolean flag;
+        final boolean mFlag;
 
         public SetStrict(boolean flag) {
-            this.flag = flag;
+            mFlag = flag;
         }
 
         @Override
         public void exec(SQLiteQueryBuilder builder) {
-            builder.setStrict(flag);
+            builder.setStrict(mFlag);
         }
     }
 }

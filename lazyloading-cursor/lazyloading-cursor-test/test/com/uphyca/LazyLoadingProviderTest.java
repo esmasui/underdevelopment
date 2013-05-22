@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 public class LazyLoadingProviderTest extends Benchmark<LazyLoadingProvider> {

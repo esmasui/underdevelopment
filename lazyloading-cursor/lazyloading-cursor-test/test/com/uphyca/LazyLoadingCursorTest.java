@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import android.content.ContentValues;
@@ -25,7 +26,9 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
         ContentValues fuga = new ContentValues();
         fuga.put("name", "fuga");
 
-        getProvider().bulkInsert(Uri.parse(TEST_AUTHORITY), new ContentValues[] { hoge, piyo, fuga });
+        getProvider().bulkInsert(Uri.parse(TEST_AUTHORITY), new ContentValues[] {
+                hoge, piyo, fuga
+        });
     }
 
     public void testPreconditions() {
@@ -33,15 +36,21 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
     }
 
     public void testQuery() {
-        String[] projection = { "_id", "name" };
+        String[] projection = {
+                "_id", "name"
+        };
         String selection = "name = ?";
-        String[] selectionArgs = { "hoge" };
+        String[] selectionArgs = {
+            "hoge"
+        };
         String sortOrder = "name";
 
         Cursor result = getProvider().query(Uri.parse(TEST_AUTHORITY), projection, selection, selectionArgs, sortOrder);
 
         assertNotNull(result);
-        MoreAsserts.assertEquals(new String[] { "_id", "name" }, result.getColumnNames());
+        MoreAsserts.assertEquals(new String[] {
+                "_id", "name"
+        }, result.getColumnNames());
 
         assertEquals(1, result.getCount());
         assertTrue(result.moveToNext());

@@ -3,6 +3,7 @@
 	<name>lazyloading-cursor-test</name>
 	<comment></comment>
 	<projects>
+		<project>lazyloading-cursor</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

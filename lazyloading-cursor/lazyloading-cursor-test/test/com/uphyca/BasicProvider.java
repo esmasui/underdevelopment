@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import android.content.ContentValues;
@@ -18,11 +19,7 @@ public class BasicProvider extends StubProvider {
     }
 
     @Override
-    public Cursor query(Uri uri,
-                        String[] projection,
-                        String selection,
-                        String[] selectionArgs,
-                        String sortOrder) {
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 
         final SQLiteDatabase db = mSQLite.getReadableDatabase();
         final String groupBy = null;
@@ -32,14 +29,13 @@ public class BasicProvider extends StubProvider {
         SQLiteQueryBuilder queryBuilder = new SQLiteQueryBuilder();
         queryBuilder.setTables("sample");
 
-        Cursor result = queryBuilder.query(db, projection, selection, selectionArgs, groupBy, having, sortOrder, limit, null);
+        Cursor result = queryBuilder.query(db, projection, selection, selectionArgs, groupBy, having, sortOrder, limit);
 
         return result;
     }
 
     @Override
-    public Uri insert(Uri uri,
-                      ContentValues values) {
+    public Uri insert(Uri uri, ContentValues values) {
 
         long id = mSQLite.getWritableDatabase()
                          .insert("sample", null, values);

@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import java.util.ArrayList;
@@ -14,116 +15,103 @@ import android.database.sqlite.SQLiteCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
-import android.os.CancellationSignal;
 
 public class LazyLoadingCursor extends AbstractCursor {
 
-    class LazyLoadingDataSetObserver extends DataSetObserver {
-
+    private final class LazyLoadingDataSetObserver extends DataSetObserver {
         @Override
         public void onInvalidated() {
             super.onInvalidated();
-            count = -1;
-            cursorIndex = -1;
+            mCount = -1;
+            mCursorIndex = -1;
         }
     }
 
-    private final DataSetObserver dataSetObserver;
+    private final DataSetObserver mDataSetObserver;
 
-    private final Cursor counter;
-    private final int blockSize;
+    private final Cursor mCounter;
+    private final int mBlockSize;
 
-    private final Context context;
-    private final Uri contentUri;
-    private List<Cursor> cursors;
-    private Cursor cursor;
-    private int count;
-    private int cursorIndex;
+    private final Context mContext;
+    private final Uri mContentUri;
+    private List<Cursor> mCursors;
+    private Cursor mCursor;
+    private int mCount;
+    private int mCursorIndex;
 
-    private final String[] columns;
-    private final String selection;
-    private final String[] selectionArgs;
-    private final String groupBy;
-    private final String having;
-    private final String orderBy;
+    private final String[] mColumns;
+    private final String mSelection;
+    private final String[] mSelectionArgs;
+    private final String mGroupBy;
+    private final String mHaving;
+    private final String mOrderBy;
 
-    private final String[] columnNames;
+    private final String[] mColumnNames;
 
-    private List<Operations.Operation> op = new ArrayList<Operations.Operation>();
+    private List<Operations.Operation> mOperations = new ArrayList<Operations.Operation>();
 
-    private final SQLiteDatabase db;
+    private final SQLiteDatabase mDatabase;
 
-    public LazyLoadingCursor(Context context,
-                             Uri uri,
-                             SQLiteDatabase db,
-                             List<Operations.Operation> op,
-                             String[] projectionIn,
-                             String selection,
-                             String[] selectionArgs,
-                             String groupBy,
-                             String having,
-                             String sortOrder,
-                             CancellationSignal cancellationSignal,
-                             int blockSize) {
-        this.context = context;
-        this.contentUri = uri;
-        this.db = db;
-        this.op = op;
-        this.blockSize = blockSize;
+    public LazyLoadingCursor(Context context, Uri uri, SQLiteDatabase db, List<Operations.Operation> op, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, int blockSize) {
+        mContext = context;
+        mContentUri = uri;
+        mDatabase = db;
+        mOperations = op;
+        mBlockSize = blockSize;
 
-        this.columns = projectionIn;
-        this.selection = selection;
-        this.selectionArgs = selectionArgs;
-        this.groupBy = groupBy;
-        this.having = having;
-        this.orderBy = sortOrder;
+        mColumns = projectionIn;
+        mSelection = selection;
+        mSelectionArgs = selectionArgs;
+        mGroupBy = groupBy;
+        mHaving = having;
+        mOrderBy = sortOrder;
 
-        cursors = new ArrayList<Cursor>();
-        cursorIndex = -1;
+        mCursors = new ArrayList<Cursor>();
+        mCursorIndex = -1;
 
-        db.setPageSize(blockSize);
-        
         SQLiteQueryBuilder builder = execOperations(new SQLiteQueryBuilder());
-        String sql = builder.buildQuery(projectionIn, selection, groupBy, having, sortOrder, null);
+        String rawSql = builder.buildQuery(projectionIn, selection, null, groupBy, having, sortOrder, limit);
 
-        String countSql = String.format("SELECT COUNT(*) COUNT FROM(%s)", sql);
+        String countSql = String.format("SELECT COUNT(" + (projectionIn != null ? projectionIn[0] : "'X'") + ") COUNT FROM(%s)", rawSql);
 
-        Cursor counter = db.rawQuery(countSql, selectionArgs, cancellationSignal);
+        Cursor counter = db.rawQuery(countSql, selectionArgs);
 
-        dataSetObserver = new LazyLoadingDataSetObserver();
-        counter.registerDataSetObserver(dataSetObserver);
+        mDataSetObserver = new LazyLoadingDataSetObserver();
+        counter.registerDataSetObserver(mDataSetObserver);
 
-        this.counter = counter;
-        this.counter.setNotificationUri(context.getContentResolver(), contentUri);
+        mCounter = counter;
+        mCounter.setNotificationUri(context.getContentResolver(), mContentUri);
 
-        Cursor cursor = builder.query(db, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, "0,0");
-        columnNames = cursor.getColumnNames();
-        cursor.close();
+        if (projectionIn == null) {
+            Cursor cursor = builder.query(db, projectionIn, selection, selectionArgs, groupBy, having, null, "0,0");
+            mColumnNames = cursor.getColumnNames();
+            cursor.close();
+        } else {
+            mColumnNames = projectionIn;
+        }
 
-        allocate(this.context, this.contentUri, db);
+        allocate(mContext, mContentUri, db);
     }
 
     private SQLiteQueryBuilder execOperations(SQLiteQueryBuilder builder) {
-        for (Operations.Operation each : op) {
+        for (Operations.Operation each : mOperations) {
             each.exec(builder);
         }
         return builder;
     }
 
-    private void allocate(Context context,
-                          Uri contentUri,
-                          SQLiteDatabase db) {
-        if (counter.isBeforeFirst()) {
-            counter.moveToFirst();
+    private void allocate(Context context, Uri contentUri, SQLiteDatabase db) {
+        if (mCounter.isBeforeFirst()) {
+            mCounter.moveToFirst();
         }
-        count = counter.getInt(0);
-        int size = count / blockSize;
-        if ((count - size * blockSize) > 0)
+        mCount = mCounter.getInt(0);
+        int size = mCount / mBlockSize;
+        if ((mCount - size * mBlockSize) > 0)
             size += 1;
 
-        List<Cursor> oldCursors = cursors;
+        List<Cursor> oldCursors = mCursors;
         if (oldCursors == null)
-            cursors = new ArrayList<Cursor>(size);
+            mCursors = new ArrayList<Cursor>(size);
 
         int oldSize = oldCursors == null ? 0 : oldCursors.size();
         for (int position = 0; position < size; ++position) {
@@ -132,34 +120,33 @@ public class LazyLoadingCursor extends AbstractCursor {
                 c.requery();
                 continue;
             }
-            CursorProxy c = new CursorProxy(null, blockSize, position);
+            CursorProxy c = new CursorProxy(null, mBlockSize, position);
             c.setNotificationUri(context.getContentResolver(), contentUri);
-            cursors.add(c);
+            mCursors.add(c);
         }
     }
 
     @Override
     public int getCount() {
         // return counter.getInt(0);
-        return count;
+        return mCount;
     }
 
     @Override
-    public boolean onMove(int oldPosition,
-                          int newPosition) {
+    public boolean onMove(int oldPosition, int newPosition) {
 
-        if (oldPosition == newPosition && cursorIndex > -1)
+        if (oldPosition == newPosition && mCursorIndex > -1)
             return true;
 
-        int index = newPosition / blockSize;
+        int index = newPosition / mBlockSize;
 
-        if (index != cursorIndex) {
-            cursor = cursors.get(index);
-            cursorIndex = index;
+        if (index != mCursorIndex) {
+            mCursor = mCursors.get(index);
+            mCursorIndex = index;
         }
 
-        int pos = newPosition - (index * blockSize);
-        return cursor.moveToPosition(pos);
+        int pos = newPosition - (index * mBlockSize);
+        return mCursor.moveToPosition(pos);
     }
 
     // /**
@@ -189,42 +176,42 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public String getString(int column) {
-        return cursor.getString(column);
+        return mCursor.getString(column);
     }
 
     @Override
     public short getShort(int column) {
-        return cursor.getShort(column);
+        return mCursor.getShort(column);
     }
 
     @Override
     public int getInt(int column) {
-        return cursor.getInt(column);
+        return mCursor.getInt(column);
     }
 
     @Override
     public long getLong(int column) {
-        return cursor.getLong(column);
+        return mCursor.getLong(column);
     }
 
     @Override
     public float getFloat(int column) {
-        return cursor.getFloat(column);
+        return mCursor.getFloat(column);
     }
 
     @Override
     public double getDouble(int column) {
-        return cursor.getDouble(column);
+        return mCursor.getDouble(column);
     }
 
     @Override
     public boolean isNull(int column) {
-        return cursor.isNull(column);
+        return mCursor.isNull(column);
     }
 
     @Override
     public byte[] getBlob(int column) {
-        return cursor.getBlob(column);
+        return mCursor.getBlob(column);
     }
 
     // @Override
@@ -238,84 +225,84 @@ public class LazyLoadingCursor extends AbstractCursor {
 
     @Override
     public String[] getColumnNames() {
-        return columnNames;
+        return mColumnNames;
     }
 
     @Override
     public void deactivate() {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c != null) {
                 c.deactivate();
             }
         }
-        counter.deactivate();
+        mCounter.deactivate();
         super.deactivate();
     }
 
     @Override
     public void close() {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c == null)
                 continue;
             c.close();
         }
-        counter.close();
+        mCounter.close();
         super.close();
     }
 
     @Override
     public void registerContentObserver(ContentObserver observer) {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c != null) {
                 c.registerContentObserver(observer);
             }
         }
-        counter.registerContentObserver(observer);
+        mCounter.registerContentObserver(observer);
     }
 
     @Override
     public void unregisterContentObserver(ContentObserver observer) {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c != null) {
                 c.unregisterContentObserver(observer);
             }
         }
-        counter.unregisterContentObserver(observer);
+        mCounter.unregisterContentObserver(observer);
     }
 
     @Override
     public void registerDataSetObserver(DataSetObserver observer) {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c != null) {
                 c.registerDataSetObserver(observer);
             }
         }
-        counter.registerDataSetObserver(observer);
+        mCounter.registerDataSetObserver(observer);
     }
 
     @Override
     public void unregisterDataSetObserver(DataSetObserver observer) {
-        for (int i = 0, length = cursors.size(); i < length; i++) {
-            Cursor c = cursors.get(i);
+        for (int i = 0, length = mCursors.size(); i < length; i++) {
+            Cursor c = mCursors.get(i);
             if (c != null) {
                 c.unregisterDataSetObserver(observer);
             }
         }
-        counter.unregisterDataSetObserver(observer);
+        mCounter.unregisterDataSetObserver(observer);
     }
 
     @Override
     public boolean requery() {
-        if (counter.requery() == false) {
+        if (mCounter.requery() == false) {
             return false;
         }
 
-        allocate(context, contentUri, db);
+        allocate(mContext, mContentUri, mDatabase);
 
         // for (int i = 0, length = cursors.size(); i < length; i++) {
         // Cursor c = cursors.get(i);
@@ -331,57 +318,54 @@ public class LazyLoadingCursor extends AbstractCursor {
         return true;
     }
 
-    private class CursorProxy extends AbstractCursor {
+    private final class CursorProxy extends AbstractCursor {
 
-        Set<DataSetObserver> dataSetObservers;
-        Set<ContentObserver> contentObservers;
+        Set<DataSetObserver> mDataSetObservers;
+        Set<ContentObserver> mContentObservers;
 
-        int amount;
-        int position;
-        Cursor underlying;
+        int mAmount;
+        int mPosition;
+        Cursor mUnderlying;
 
-        public CursorProxy(Cursor cursor,
-                           int amount,
-                           int position) {
-            underlying = cursor;
-            this.amount = amount;
-            this.position = position;
+        public CursorProxy(Cursor cursor, int amount, int position) {
+            mUnderlying = cursor;
+            mAmount = amount;
+            mPosition = position;
         }
 
-        void swapCursor(Cursor cursor) {
-            if (contentObservers != null) {
-                for (ContentObserver observer : contentObservers)
+        final void swapCursor(Cursor cursor) {
+            if (mContentObservers != null) {
+                for (ContentObserver observer : mContentObservers)
                     cursor.registerContentObserver(observer);
             }
-            if (dataSetObservers != null) {
-                for (DataSetObserver observer : dataSetObservers)
+            if (mDataSetObservers != null) {
+                for (DataSetObserver observer : mDataSetObservers)
                     cursor.registerDataSetObserver(observer);
             }
-            underlying = cursor;
+            mUnderlying = cursor;
         }
 
         @Override
         public int getCount() {
-            int offset = position * amount;
+            int offset = mPosition * mAmount;
             int count = LazyLoadingCursor.this.getCount();
             int t = count - offset;
-            if (t > amount) {
-                return amount;
+            if (t > mAmount) {
+                return mAmount;
             }
             return t;
         }
 
         @Override
-        public boolean onMove(int oldPosition,
-                              int newPosition) {
-            if (underlying == null) {
+        public boolean onMove(int oldPosition, int newPosition) {
+            if (mUnderlying == null) {
                 SQLiteQueryBuilder builder = execOperations(new SQLiteQueryBuilder());
-                String limit = (position * amount) + "," + amount;
-                SQLiteCursor c = (SQLiteCursor) builder.query(db, columns, selection, selectionArgs, groupBy, having, orderBy, limit);
+                String limit = (mPosition * mAmount) + "," + mAmount;
+                SQLiteCursor c = (SQLiteCursor) builder.query(mDatabase, mColumns, mSelection, mSelectionArgs, mGroupBy, mHaving, mOrderBy, limit);
                 swapCursor(c);
             }
             try {
-                return underlying.moveToPosition(newPosition);
+                return mUnderlying.moveToPosition(newPosition);
             } catch (IllegalStateException e) {
                 return false;
             }
@@ -409,99 +393,99 @@ public class LazyLoadingCursor extends AbstractCursor {
 
         @Override
         public String getString(int column) {
-            return underlying.getString(column);
+            return mUnderlying.getString(column);
         }
 
         @Override
         public short getShort(int column) {
-            return underlying.getShort(column);
+            return mUnderlying.getShort(column);
         }
 
         @Override
         public int getInt(int column) {
-            return underlying.getInt(column);
+            return mUnderlying.getInt(column);
         }
 
         @Override
         public long getLong(int column) {
-            return underlying.getLong(column);
+            return mUnderlying.getLong(column);
         }
 
         @Override
         public float getFloat(int column) {
-            return underlying.getFloat(column);
+            return mUnderlying.getFloat(column);
         }
 
         @Override
         public double getDouble(int column) {
-            return underlying.getDouble(column);
+            return mUnderlying.getDouble(column);
         }
 
         @Override
         public boolean isNull(int column) {
-            return underlying.isNull(column);
+            return mUnderlying.isNull(column);
         }
 
         @Override
         public byte[] getBlob(int column) {
-            return underlying.getBlob(column);
+            return mUnderlying.getBlob(column);
         }
 
         @Override
         public String[] getColumnNames() {
-            return columnNames;
+            return mColumnNames;
         }
 
         @Override
         public void deactivate() {
-            underlying.deactivate();
+            mUnderlying.deactivate();
             super.deactivate();
         }
 
         @Override
         public void close() {
-            if (underlying != null)
-                underlying.close();
+            if (mUnderlying != null)
+                mUnderlying.close();
             super.close();
         }
 
         @Override
         public void registerContentObserver(ContentObserver observer) {
-            if (contentObservers == null)
-                contentObservers = new HashSet<ContentObserver>();
-            contentObservers.add(observer);
-            if (underlying != null)
-                underlying.registerContentObserver(observer);
+            if (mContentObservers == null)
+                mContentObservers = new HashSet<ContentObserver>();
+            mContentObservers.add(observer);
+            if (mUnderlying != null)
+                mUnderlying.registerContentObserver(observer);
         }
 
         @Override
         public void unregisterContentObserver(ContentObserver observer) {
-            if (contentObservers != null)
-                contentObservers.remove(observer);
-            if (underlying != null)
-                underlying.unregisterContentObserver(observer);
+            if (mContentObservers != null)
+                mContentObservers.remove(observer);
+            if (mUnderlying != null)
+                mUnderlying.unregisterContentObserver(observer);
         }
 
         @Override
         public void registerDataSetObserver(DataSetObserver observer) {
-            if (dataSetObservers == null)
-                dataSetObservers = new HashSet<DataSetObserver>();
-            if (underlying != null)
-                underlying.registerDataSetObserver(observer);
+            if (mDataSetObservers == null)
+                mDataSetObservers = new HashSet<DataSetObserver>();
+            if (mUnderlying != null)
+                mUnderlying.registerDataSetObserver(observer);
         }
 
         @Override
         public void unregisterDataSetObserver(DataSetObserver observer) {
-            if (dataSetObservers != null)
-                dataSetObservers.remove(observer);
-            if (underlying != null)
-                underlying.unregisterDataSetObserver(observer);
+            if (mDataSetObservers != null)
+                mDataSetObservers.remove(observer);
+            if (mUnderlying != null)
+                mUnderlying.unregisterDataSetObserver(observer);
         }
 
         @Override
         public boolean requery() {
-            if (underlying != null)
-                return underlying.requery();
+            if (mUnderlying != null)
+                return mUnderlying.requery();
             return true;
         }
     }

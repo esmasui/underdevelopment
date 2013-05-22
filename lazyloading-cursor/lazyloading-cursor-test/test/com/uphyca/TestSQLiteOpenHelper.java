@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import android.content.Context;
@@ -10,14 +11,8 @@ public class TestSQLiteOpenHelper extends SQLiteOpenHelper {
     private static final String CREATE_TABLE_DDL = "CREATE TABLE sample(_id integer primary key autoincrement not null, name VARCHAR);";
     private static final String DROP_TABLE_DDL = "DROP TABLE IF EXISTS sample";
 
-    public TestSQLiteOpenHelper(Context context,
-                                String name,
-                                CursorFactory factory,
-                                int version) {
-        super(context,
-              name,
-              factory,
-              version);
+    public TestSQLiteOpenHelper(Context context, String name, CursorFactory factory, int version) {
+        super(context, name, factory, version);
     }
 
     @Override
@@ -26,9 +21,7 @@ public class TestSQLiteOpenHelper extends SQLiteOpenHelper {
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db,
-                          int oldVersion,
-                          int newVersion) {
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         db.execSQL(DROP_TABLE_DDL);
         onCreate(db);
     }

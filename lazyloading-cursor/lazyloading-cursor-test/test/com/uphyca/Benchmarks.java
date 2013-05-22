@@ -1,3 +1,4 @@
+
 package com.uphyca;
 
 import junit.framework.TestCase;
@@ -10,11 +11,6 @@ public class Benchmarks extends TestCase {
 
         suite.addTestSuite(LazyLoadingProviderTest.class);
         suite.addTestSuite(BasicProviderTest.class);
-
-        suite.addTestSuite(BasicProviderTest.class);
-        suite.addTestSuite(LazyLoadingProviderTest.class);
-
-
 
         return suite;
     }
