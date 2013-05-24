@@ -1,5 +1,5 @@
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import junit.framework.TestCase;
 import junit.framework.TestSuite;

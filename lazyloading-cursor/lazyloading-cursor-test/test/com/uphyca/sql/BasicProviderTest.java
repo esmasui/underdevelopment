@@ -1,5 +1,5 @@
 
-package com.uphyca;
+package com.uphyca.sql;
 
 public class BasicProviderTest extends Benchmark<BasicProvider> {
 

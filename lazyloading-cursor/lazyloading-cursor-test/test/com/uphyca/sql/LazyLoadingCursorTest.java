@@ -1,5 +1,5 @@
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import java.util.ArrayList;
 import java.util.List;

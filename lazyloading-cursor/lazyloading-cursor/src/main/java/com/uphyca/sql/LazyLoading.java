@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteQueryBuilder;
@@ -22,11 +22,20 @@ import android.net.Uri;
 
 public final class LazyLoading {
 
+    public static final SQLiteQueryBuilder newQueryBuilder(Context context, Uri uri, CountQueryBuilder builder) {
+        return new LazyLoadingSQLiteQueryBuilder(context, uri, builder);
+    }
+
+    public static final SQLiteQueryBuilder newQueryBuilder(Context context, Uri uri, CountQueryBuilder builder, int blockSize) {
+        return new LazyLoadingSQLiteQueryBuilder(context, uri, builder, blockSize);
+    }
+
     public static final SQLiteQueryBuilder newQueryBuilder(Context context, Uri uri) {
-        return new LazyLoadingSQLiteQueryBuilder(context, uri);
+        return new LazyLoadingSQLiteQueryBuilder(context, uri, null);
     }
 
     public static final SQLiteQueryBuilder newQueryBuilder(Context context, Uri uri, int blockSize) {
-        return new LazyLoadingSQLiteQueryBuilder(context, uri, blockSize);
+        return new LazyLoadingSQLiteQueryBuilder(context, uri, null, blockSize);
     }
+
 }

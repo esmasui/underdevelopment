@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import java.util.Map;
 

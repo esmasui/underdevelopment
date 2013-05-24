@@ -1,5 +1,5 @@
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import android.content.ContentValues;
 import android.database.Cursor;

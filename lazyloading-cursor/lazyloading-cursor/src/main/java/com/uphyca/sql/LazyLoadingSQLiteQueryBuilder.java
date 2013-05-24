@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,20 +32,22 @@ import android.os.CancellationSignal;
 
 class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
 
-    private static final int DEFAULT_BLOCK_SIZE = 256;
+    private static final int DEFAULT_BLOCK_SIZE = 128;
 
     private final List<Operations.Operation> mOperations = new ArrayList<Operations.Operation>();
     private final Context mContext;
     private final Uri mUri;
     private final int mBlockSize;
+    private final CountQueryBuilder mBuilder;
 
-    public LazyLoadingSQLiteQueryBuilder(Context context, Uri uri) {
-        this(context, uri, DEFAULT_BLOCK_SIZE);
+    public LazyLoadingSQLiteQueryBuilder(Context context, Uri uri, CountQueryBuilder builder) {
+        this(context, uri, builder, DEFAULT_BLOCK_SIZE);
     }
 
-    public LazyLoadingSQLiteQueryBuilder(Context context, Uri uri, int blockSize) {
+    public LazyLoadingSQLiteQueryBuilder(Context context, Uri uri, CountQueryBuilder builder, int blockSize) {
         mContext = context;
         mUri = uri;
+        mBuilder = builder;
         mBlockSize = blockSize;
     }
 
@@ -155,7 +157,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      */
     @Override
     public Cursor query(SQLiteDatabase db, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, CancellationSignal cancellationSignal) {
-        return new LazyLoadingCursor(mContext, mUri, db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, mBlockSize);
+        return new LazyLoadingCursor(mContext, mUri, db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, mBuilder, mBlockSize);
     }
 
     /*

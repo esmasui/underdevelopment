@@ -1,5 +1,5 @@
 
-package com.uphyca;
+package com.uphyca.sql;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;

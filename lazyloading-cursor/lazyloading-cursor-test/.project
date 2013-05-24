@@ -33,9 +33,9 @@
 	</natures>
 	<linkedResources>
 		<link>
-			<name>src</name>
+			<name>java</name>
 			<type>2</type>
-			<location>/Users/masui/gitroot/underdevelopment/lazyloading-cursor/lazyloading-cursor/src/main/java</location>
+			<locationURI>PARENT-1-PROJECT_LOC/lazyloading-cursor/src/main/java</locationURI>
 		</link>
 	</linkedResources>
 </projectDescription>
