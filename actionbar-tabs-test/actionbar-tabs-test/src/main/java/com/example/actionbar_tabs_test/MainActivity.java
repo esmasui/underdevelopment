@@ -80,6 +80,7 @@ public class MainActivity extends SherlockFragmentActivity implements ActionBar.
         // 別のアクティビティを起動します
         mHandler.sendEmptyMessage(0);
 
+        //Support package の Fragment を使うときの注意点 - http://y-anz-m.blogspot.jp/2013/05/support-package-fragment.html
         setContentView(new FrameLayout(this));
 
         // タブを作成します
