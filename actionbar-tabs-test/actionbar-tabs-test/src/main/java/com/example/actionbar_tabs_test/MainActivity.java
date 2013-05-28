@@ -40,7 +40,7 @@ public class MainActivity extends SherlockFragmentActivity implements ActionBar.
             b.append("Tab No.");
             b.append(Integer.toString(getArguments().getInt("position")));
             b.append("\n");
-            for(int i = 0; i < 100; ++i){
+            for (int i = 0; i < 100; ++i) {
                 b.append("The quick brown fox jumps over the lazy dog ");
             }
             text.setText(b.toString());
@@ -60,7 +60,7 @@ public class MainActivity extends SherlockFragmentActivity implements ActionBar.
             switch (msg.what) {
                 case 0:
                     Activity owner = mOwner.get();
-                    if(owner != null){
+                    if (owner != null) {
                         owner.startActivity(new Intent(owner, SubActivity.class));
                     }
                     break;
