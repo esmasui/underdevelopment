@@ -9,7 +9,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.test.MoreAsserts;
 import android.test.ProviderTestCase2;
-import android.util.Log;
 
 public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider> {
 

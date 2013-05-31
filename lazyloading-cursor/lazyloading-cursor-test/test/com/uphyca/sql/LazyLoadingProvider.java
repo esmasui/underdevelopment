@@ -26,7 +26,7 @@ public class LazyLoadingProvider extends StubProvider {
         final String having = null;
         final String limit = null;
 
-        SQLiteQueryBuilder queryBuilder = LazyLoading.newQueryBuilder(getContext(), Uri.parse("content://com.uphyca/lazy"), 256);
+        SQLiteQueryBuilder queryBuilder = LazyLoading.newQueryBuilder(256);
         queryBuilder.setTables("sample");
 
         Cursor result = queryBuilder.query(db, projection, selection, selectionArgs, groupBy, having, sortOrder, limit);
