@@ -28,7 +28,7 @@ import android.database.sqlite.SQLiteCursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 
-class LazyLoadingCursor extends AbstractCursor {
+final class LazyLoadingCursor extends AbstractCursor {
 
     private final class LazyLoadingDataSetObserver extends DataSetObserver {
         @Override

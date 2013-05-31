@@ -14,7 +14,7 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
 
     private static final String TEST_AUTHORITY = "com.uphyca.lazyloadingcursor";
     private static final int RECORD_COUNT = 30000;
-    private static final boolean FETCH_ALL = true;
+    private static final boolean FETCH_ALL = false;
 
     public Benchmark(Class<T> providerClass) {
         super(providerClass, TEST_AUTHORITY);
@@ -91,6 +91,7 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
                    });
     }
 
+    @SuppressWarnings("unused")
     void invokeTest(String selection, String[] selectionArgs) {
         long current = System.currentTimeMillis();
 
@@ -112,6 +113,8 @@ public abstract class Benchmark<T extends ContentProvider> extends ProviderTestC
 
         result.close();
 
-        Log.i("Benchmark", toString() + ":fetchAll=" + (System.currentTimeMillis() - current) + "(ms)");
+        if (FETCH_ALL) {
+            Log.i("Benchmark", toString() + ":fetchAll=" + (System.currentTimeMillis() - current) + "(ms)");
+        }
     }
 }

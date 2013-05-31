@@ -28,16 +28,20 @@ import android.database.sqlite.SQLiteDatabase.CursorFactory;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.os.CancellationSignal;
 
-class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
+public class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
 
     private static final int DEFAULT_BLOCK_SIZE = 128;
 
     private final List<Operations.Operation> mOperations = new ArrayList<Operations.Operation>();
     private final int mBlockSize;
-    private final CountQueryBuilder mBuilder;
+    private final CountQueryBuilder mCountQueryBuilder;
 
     public LazyLoadingSQLiteQueryBuilder() {
         this(null);
+    }
+
+    public LazyLoadingSQLiteQueryBuilder(int blockSize) {
+        this(null, blockSize);
     }
 
     public LazyLoadingSQLiteQueryBuilder(CountQueryBuilder builder) {
@@ -45,7 +49,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
     }
 
     public LazyLoadingSQLiteQueryBuilder(CountQueryBuilder builder, int blockSize) {
-        mBuilder = builder;
+        mCountQueryBuilder = builder;
         mBlockSize = blockSize;
     }
 
@@ -155,7 +159,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      */
     @Override
     public Cursor query(SQLiteDatabase db, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit, CancellationSignal cancellationSignal) {
-        return new LazyLoadingCursor(db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, mBuilder, mBlockSize);
+        return new LazyLoadingCursor(db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, mCountQueryBuilder, mBlockSize);
     }
 
     /*
@@ -168,7 +172,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      */
     @Override
     public Cursor query(SQLiteDatabase db, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder, String limit) {
-        return query(db, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, null);
+        return new LazyLoadingCursor(db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, limit, mCountQueryBuilder, mBlockSize);
     }
 
     /*
@@ -180,7 +184,7 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
      */
     @Override
     public Cursor query(SQLiteDatabase db, String[] projectionIn, String selection, String[] selectionArgs, String groupBy, String having, String sortOrder) {
-        return query(db, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, null, null);
+        return new LazyLoadingCursor(db, mOperations, projectionIn, selection, selectionArgs, groupBy, having, sortOrder, null, mCountQueryBuilder, mBlockSize);
     }
 
     /*
