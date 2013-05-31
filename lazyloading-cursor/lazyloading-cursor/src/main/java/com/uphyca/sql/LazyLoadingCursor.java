@@ -39,6 +39,8 @@ class LazyLoadingCursor extends AbstractCursor {
         }
     }
 
+    private static final double MAX_BLOCK_SIZE = 1024;
+
     private Set<DataSetObserver> mDataSetObservers;
     private Set<ContentObserver> mContentObservers;
 
@@ -127,7 +129,7 @@ class LazyLoadingCursor extends AbstractCursor {
         }
     }
 
-    private void initCount() {
+    private void ensureCount() {
         if (mCounter != null) {
             return;
         }
@@ -137,7 +139,7 @@ class LazyLoadingCursor extends AbstractCursor {
         mCursors = new CursorProxy[calcBlockCount(mCount, mBlockSize)];
     }
 
-    private void initColumnNames() {
+    private void ensureColumnNames() {
         if (mColumnNames != null) {
             return;
         }
@@ -158,7 +160,7 @@ class LazyLoadingCursor extends AbstractCursor {
     }
 
     private static final int calcActualBlockSize(int blockSize, int position) {
-        return (int) (blockSize * Math.pow(2, position));
+        return (int) Math.min(blockSize * Math.pow(2, position), MAX_BLOCK_SIZE);
     }
 
     private static final int calcBlockCount(int rawCount, int blockSize) {
@@ -212,7 +214,8 @@ class LazyLoadingCursor extends AbstractCursor {
     @Override
     public int getCount() {
 
-        initCount();
+        ensureCount();
+        ensureColumnNames();
 
         return mCount;
     }
@@ -220,7 +223,7 @@ class LazyLoadingCursor extends AbstractCursor {
     @Override
     public boolean onMove(int oldPosition, int newPosition) {
 
-        initCount();
+        ensureCount();
 
         final CursorProxy c = mCursor;
 
@@ -309,19 +312,10 @@ class LazyLoadingCursor extends AbstractCursor {
         return mCursor.getBlob(column);
     }
 
-    // @Override
-    // public String[] getColumnNames() {
-    // if (cursor != null) {
-    // return cursor.getColumnNames();
-    // } else {
-    // return new String[0];
-    // }
-    // }
-
     @Override
     public String[] getColumnNames() {
 
-        initColumnNames();
+        ensureColumnNames();
 
         return mColumnNames;
     }

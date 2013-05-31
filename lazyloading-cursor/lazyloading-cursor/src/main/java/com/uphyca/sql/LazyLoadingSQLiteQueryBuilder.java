@@ -36,6 +36,10 @@ class LazyLoadingSQLiteQueryBuilder extends SQLiteQueryBuilder {
     private final int mBlockSize;
     private final CountQueryBuilder mBuilder;
 
+    public LazyLoadingSQLiteQueryBuilder() {
+        this(null);
+    }
+
     public LazyLoadingSQLiteQueryBuilder(CountQueryBuilder builder) {
         this(builder, DEFAULT_BLOCK_SIZE);
     }

@@ -4,6 +4,7 @@ package com.uphyca.sql;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
@@ -81,6 +82,7 @@ public class LazyLoadingCursorTest extends ProviderTestCase2<LazyLoadingProvider
         invokeTestThreshold(blockSize, blockSize * 10 + 1);
     }
 
+    @SuppressLint("DefaultLocale")
     private void invokeTestThreshold(int blockSize, int count) {
 
         List<ContentValues> values = new ArrayList<ContentValues>();
